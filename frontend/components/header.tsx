@@ -17,15 +17,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 export function Header() {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 items-center">
-        <div className="mr-4 flex">
-          <Link href="/" className="mr-6 flex items-center space-x-2">
-            <Bot className="h-6 w-6" />
-            <span className="font-bold">AgentHub</span>
-          </Link>
-          {/* "Explore"と"About"のリンクを削除しました */}
-        </div>
-        <div className="flex flex-1 items-center justify-end space-x-4">
+      {/* ↓↓ このdivのクラスと内部構造を修正しました ↓↓ */}
+      <div className="container flex h-14 items-center justify-between">
+        {/* 左側のロゴ */}
+        <Link href="/" className="flex items-center space-x-2">
+          <Bot className="h-6 w-6" />
+          <span className="font-bold">AgentHub</span>
+        </Link>
+
+        {/* 右側のアイコン */}
+        <div className="flex items-center space-x-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="relative h-8 w-8 rounded-full">
