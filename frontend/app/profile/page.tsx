@@ -1,15 +1,12 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Bot, GitBranch } from "lucide-react";
+import { Bot, GitBranch, Plus } from "lucide-react"; // Plusアイコンをインポート
 import Link from "next/link";
 import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
 import { Agent, User } from "@/lib/data";
+import { Button } from "@/components/ui/button"; // Buttonコンポーネントをインポート
 
 export default function ProfilePage() {
   // モックデータから特定のユーザーを取得（ここでは最初のユーザーを仮定）
@@ -41,7 +38,16 @@ export default function ProfilePage() {
 
         {/* 右側: エージェント一覧 */}
         <div className="flex-1">
-          <h2 className="text-xl font-semibold">Agents</h2>
+          {/* ↓↓ ここから下を修正しました ↓↓ */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">Agents</h2>
+            <Button asChild>
+              <Link href="/new">
+                <Plus className="mr-2 h-4 w-4" /> New Agent
+              </Link>
+            </Button>
+          </div>
+          {/* ↑↑ ここまで ↑↑ */}
           <Separator className="my-4" />
           <div className="space-y-4">
             {userAgents.map((agent) => (
@@ -74,4 +80,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
