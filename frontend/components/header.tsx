@@ -15,9 +15,11 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 export function Header() {
+  // モックデータに基づき、現在のログインユーザー名を仮定
+  const currentUserName = "Koichi";
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      {/* ↓↓ このdivのクラスと内部構造を修正しました ↓↓ */}
       <div className="container flex h-14 items-center justify-between">
         {/* 左側のロゴ */}
         <Link href="/" className="flex items-center space-x-2">
@@ -50,7 +52,8 @@ export function Header() {
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuGroup>
-                <Link href="/profile">
+                {/* ↓↓ ここを修正しました ↓↓ */}
+                <Link href={`/${currentUserName}`}>
                   <DropdownMenuItem>
                     <User className="mr-2 h-4 w-4" />
                     <span>Your profile</span>
