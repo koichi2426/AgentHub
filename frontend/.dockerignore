@@ -1,0 +1,11 @@
+# AgentHub/frontend/.dockerignore
+
+.git
+.gitignore
+Dockerfile
+node_modules
+.next
+out
+npm-debug.log
+README.md
+.vscode

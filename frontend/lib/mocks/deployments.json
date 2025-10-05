@@ -1,0 +1,17 @@
+[
+  {
+    "id": "dep_001",
+    "modelId": "model_dataanalyzerpro_v1_base",
+    "status": "active",
+    "endpoint": "https://api.agenthub.dev/koichi/dataanalyzer-pro/v1",
+    "createdAt": "2024-09-20T18:00:00Z"
+  },
+  {
+    "id": "dep_002",
+    "modelId": "model_abc_v2",
+    "status": "inactive",
+    "endpoint": "https://api.agenthub.dev/koichi/dataanalyzer-pro/v2",
+    "createdAt": "2024-10-01T13:00:00Z"
+  }
+]
+
