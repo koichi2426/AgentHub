@@ -1,5 +1,4 @@
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-// ↓↓ この行に CardTitle と CardDescription を追加しました ↓↓
 import {
   Card,
   CardContent,
@@ -8,12 +7,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, GitBranch, BookUser } from "lucide-react";
+import { Bot, GitBranch, BookUser, Plus } from "lucide-react"; // Plusアイコンをインポート
 import Link from "next/link";
 import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
-import { Agent, User } from "@/lib/data";
-import { notFound } from "next/navigation"; // ユーザーが見つからない場合に使用
+import { User } from "@/lib/data"; // Agentの型はモックデータから推論されるため不要に
+import { notFound } from "next/navigation";
+import { Button } from "@/components/ui/button"; // Buttonをインポート
 
 // ページのPropsの型を定義
 type UserProfilePageProps = {
@@ -34,9 +34,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
   }
 
   // そのユーザーがオーナーのエージェントをフィルタリング
-  const userAgents = agents.filter(
-    (agent: Agent) => agent.owner === user.name
-  );
+  const userAgents = agents.filter((agent) => agent.owner === user.name);
 
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
@@ -92,7 +90,17 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
 
             {/* Agentsタブの内容 */}
             <TabsContent value="agents" className="mt-6">
-              <div className="space-y-4">
+              {/* ↓↓ ここから下を追記・修正しました ↓↓ */}
+              <div className="flex items-center justify-end">
+                <Button asChild>
+                  <Link href="/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New
+                  </Link>
+                </Button>
+              </div>
+              <div className="mt-4 space-y-4">
+              {/* ↑↑ ここまで ↑↑ */}
                 {userAgents.map((agent) => (
                   <Card key={agent.id}>
                     <CardHeader>
