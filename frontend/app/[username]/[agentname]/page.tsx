@@ -1,5 +1,7 @@
 "use client"; // Stateやインタラクションを扱うためClient Componentに
 
+import { useMemo } from "react";
+import { useRouter } from "next/navigation"; // useRouterをインポート
 import {
   Card,
   CardContent,
@@ -22,7 +24,7 @@ import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
 import jobs from "@/lib/mocks/finetuning_jobs.json";
 import deployments from "@/lib/mocks/deployments.json";
-import { User, Agent, FinetuningJob, Deployment } from "@/lib/data";
+import { User, Agent } from "@/lib/data";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -56,36 +58,40 @@ type AgentPageProps = {
 };
 
 export default function AgentPage({ params }: AgentPageProps) {
-  // ↓↓ ここから下の4つの変数定義の型指定を削除しました ↓↓
-  const user = users.find(
-    (u) => u.name.toLowerCase() === params.username.toLowerCase()
-  );
-  const agent = agents.find(
-    (a) =>
-      a.owner.toLowerCase() === params.username.toLowerCase() &&
-      a.name.toLowerCase() === params.agentname.toLowerCase()
-  );
+  const router = useRouter(); // useRouterフックを初期化
+
+  const { user, agent } = useMemo(() => {
+    const foundUser = users.find(
+      (u) => u.name.toLowerCase() === params.username.toLowerCase()
+    );
+    const foundAgent = agents.find(
+      (a) =>
+        a.owner.toLowerCase() === params.username.toLowerCase() &&
+        a.name.toLowerCase() === params.agentname.toLowerCase()
+    );
+    return { user: foundUser, agent: foundAgent };
+  }, [params.username, params.agentname]);
 
   if (!user || !agent) {
     notFound();
   }
 
-  const agentJobs = jobs.filter(
-    (job) => job.agentId === agent.id
-  );
-  // ベースモデルとファインチューニングで生成されたモデルのIDリストを作成
-  const agentModelIds = [
-    `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`, // 仮のベースモデルID
-    ...agentJobs.map((j) => j.modelId),
-  ];
-  const agentDeployments = deployments.filter((dep) =>
-    agentModelIds.includes(dep.modelId)
-  );
-  // ↑↑ ここまで ↑↑
+  const { agentJobs, agentDeployments } = useMemo(() => {
+    if (!agent) return { agentJobs: [], agentDeployments: [] };
+
+    const filteredJobs = jobs.filter((job) => job.agentId === agent.id);
+    const modelIds = [
+      `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`,
+      ...filteredJobs.map((j) => j.modelId),
+    ];
+    const filteredDeployments = deployments.filter((dep) =>
+      modelIds.includes(dep.modelId)
+    );
+    return { agentJobs: filteredJobs, agentDeployments: filteredDeployments };
+  }, [agent]);
 
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
-      {/* ヘッダー部分 */}
       <div className="mb-8">
         <h1 className="text-2xl font-normal">
           <Link
@@ -100,7 +106,6 @@ export default function AgentPage({ params }: AgentPageProps) {
         <p className="mt-2 text-muted-foreground">{agent.description}</p>
       </div>
 
-      {/* タブコンテンツ */}
       <Tabs defaultValue="api" className="w-full">
         <TabsList>
           <TabsTrigger value="finetuning">
@@ -117,7 +122,6 @@ export default function AgentPage({ params }: AgentPageProps) {
           </TabsTrigger>
         </TabsList>
 
-        {/* Fine-tuning タブ */}
         <TabsContent value="finetuning" className="mt-6">
           <Card>
             <CardHeader>
@@ -153,15 +157,28 @@ export default function AgentPage({ params }: AgentPageProps) {
                 </TableHeader>
                 <TableBody>
                   {agentJobs.map((job) => (
-                    <TableRow key={job.id}>
-                      <TableCell className="font-mono">{job.id}</TableCell>
+                    // ↓↓ TableRow全体をクリッカブルに修正しました ↓↓
+                    <TableRow
+                      key={job.id}
+                      className="cursor-pointer hover:bg-muted/50"
+                      onClick={() =>
+                        router.push(
+                          `/${user.name}/${agent.name}/finetuning/${job.id}`
+                        )
+                      }
+                    >
+                      <TableCell className="font-mono text-primary">
+                        {job.id}
+                      </TableCell>
                       <TableCell className="font-mono">
                         {job.modelId}
                       </TableCell>
                       <TableCell>
                         <Badge
                           variant={
-                            job.status === "completed" ? "default" : "secondary"
+                            job.status === "completed"
+                              ? "default"
+                              : "secondary"
                           }
                         >
                           {job.status}
@@ -178,7 +195,6 @@ export default function AgentPage({ params }: AgentPageProps) {
           </Card>
         </TabsContent>
 
-        {/* Deployments(API) タブ */}
         <TabsContent value="api" className="mt-6">
           <Card>
             <CardHeader>
@@ -207,7 +223,9 @@ export default function AgentPage({ params }: AgentPageProps) {
                       <TableCell>
                         <Badge
                           variant={
-                            dep.status === "active" ? "outline" : "secondary"
+                            dep.status === "active"
+                              ? "outline"
+                              : "secondary"
                           }
                         >
                           <span
@@ -272,7 +290,6 @@ export default function AgentPage({ params }: AgentPageProps) {
           </Card>
         </TabsContent>
 
-        {/* Settings タブ */}
         <TabsContent value="settings" className="mt-6">
           <p>Settings...</p>
         </TabsContent>

@@ -1,3 +1,6 @@
+"use client"; // paramsを安全に扱うためClient Componentに
+
+import { useMemo } from "react"; // useMemoをインポート
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Card,
@@ -23,18 +26,26 @@ type UserProfilePageProps = {
 };
 
 export default function UserProfilePage({ params }: UserProfilePageProps) {
-  // URLのusernameパラメータを使って、モックデータから該当ユーザーを探す
-  const user = users.find(
-    (u: User) => u.name.toLowerCase() === params.username.toLowerCase()
-  );
+  // ↓↓ データ検索ロジックをuseMemoでラップしました ↓↓
+  const { user, userAgents } = useMemo(() => {
+    const foundUser = users.find(
+      (u) => u.name.toLowerCase() === params.username.toLowerCase()
+    );
+
+    if (!foundUser) {
+      return { user: null, userAgents: [] };
+    }
+
+    const foundUserAgents = agents.filter(
+      (agent) => agent.owner === foundUser.name
+    );
+    return { user: foundUser, userAgents: foundUserAgents };
+  }, [params.username]);
 
   // ユーザーが見つからない場合は404ページを表示
   if (!user) {
     notFound();
   }
-
-  // そのユーザーがオーナーのエージェントをフィルタリング
-  const userAgents = agents.filter((agent) => agent.owner === user.name);
 
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
@@ -104,7 +115,6 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                     <CardHeader>
                       <div className="flex items-center gap-4">
                         <Bot className="h-6 w-6" />
-                        {/* ↓↓ ここのリンク先を修正しました ↓↓ */}
                         <Link
                           href={`/${user.name}/${agent.name}`}
                           className="text-xl font-bold text-primary hover:underline"
