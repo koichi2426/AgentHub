@@ -1,0 +1,18 @@
+[
+  {
+    "id": "job_001",
+    "agentId": "agent-1",
+    "status": "completed",
+    "createdAt": "2024-10-01T10:00:00Z",
+    "finishedAt": "2024-10-01T12:30:00Z",
+    "modelId": "model_abc_v2"
+  },
+  {
+    "id": "job_002",
+    "agentId": "agent-1",
+    "status": "running",
+    "createdAt": "2024-10-05T14:00:00Z",
+    "modelId": "model_abc_v3_inprogress"
+  }
+]
+
