@@ -1,0 +1,15 @@
+[
+  {
+    "id": "1",
+    "name": "Koichi",
+    "email": "koichi@example.com",
+    "password_hash": "password123",
+    "avatar_url": "https://github.com/shadcn.png"
+  },
+  {
+    "id": "2",
+    "name": "Alice",
+    "email": "alice@example.com",
+    "password_hash": "password123"
+  }
+]

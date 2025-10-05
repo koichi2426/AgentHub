@@ -1,0 +1,24 @@
+[
+  {
+    "id": "agent-1",
+    "name": "DataAnalyzer-Pro",
+    "owner": "Koichi",
+    "description": "Analyzes complex datasets and generates insightful reports.",
+    "version": "2.1.0"
+  },
+  {
+    "id": "agent-2",
+    "name": "CustomerSupport-Bot",
+    "owner": "Alice",
+    "description": "An automated chatbot for handling customer queries 24/7.",
+    "version": "1.5.3"
+  },
+  {
+    "id": "agent-3",
+    "name": "Internal-Code-Auditor",
+    "owner": "Koichi",
+    "description": "Scans code for security vulnerabilities. Internal use only.",
+    "version": "0.9.0"
+  }
+]
+
