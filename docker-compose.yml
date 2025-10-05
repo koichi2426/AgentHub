@@ -1,0 +1,15 @@
+# AgentHub/docker-compose.yml
+
+version: '3.8'
+
+services:
+  frontend:
+    # Dockerイメージのビルド設定
+    build:
+      # Dockerfileがあるディレクトリへのパスを指定
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: nextjs_frontend
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
