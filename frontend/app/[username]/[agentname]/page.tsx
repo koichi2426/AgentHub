@@ -1,6 +1,6 @@
 "use client"; // Stateやインタラクションを扱うためClient Componentに
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation"; // useRouterをインポート
 import {
   Card,
@@ -28,7 +28,6 @@ import { User, Agent } from "@/lib/data";
 import { notFound } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Table,
   TableBody,
@@ -58,7 +57,9 @@ type AgentPageProps = {
 };
 
 export default function AgentPage({ params }: AgentPageProps) {
-  const router = useRouter(); // useRouterフックを初期化
+  const router = useRouter();
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploading, setUploading] = useState(false);
 
   const { user, agent } = useMemo(() => {
     const foundUser = users.find(
@@ -90,14 +91,42 @@ export default function AgentPage({ params }: AgentPageProps) {
     return { agentJobs: filteredJobs, agentDeployments: filteredDeployments };
   }, [agent]);
 
+  // --- JSONLファイル送信処理 ---
+  const handleStartJob = async () => {
+    if (!selectedFile) {
+      alert("ファイルを選択してください。");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", selectedFile);
+      formData.append("agentId", agent?.id ?? "");
+
+      const res = await fetch("/api/finetuning", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        throw new Error("ファイル送信に失敗しました");
+      }
+
+      alert("ファインチューニングジョブが開始されました。");
+      setSelectedFile(null);
+    } catch (e: any) {
+      alert(e.message || "エラーが発生しました。");
+    } finally {
+      setUploading(false);
+    }
+  };
+
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
       <div className="mb-8">
         <h1 className="text-2xl font-normal">
-          <Link
-            href={`/${user.name}`}
-            className="text-primary hover:underline"
-          >
+          <Link href={`/${user.name}`} className="text-primary hover:underline">
             {user.name}
           </Link>
           <span className="mx-2 text-muted-foreground">/</span>
@@ -106,7 +135,6 @@ export default function AgentPage({ params }: AgentPageProps) {
         <p className="mt-2 text-muted-foreground">{agent.description}</p>
       </div>
 
-      {/* ↓↓ ここのdefaultValueを "finetuning" に変更しました ↓↓ */}
       <Tabs defaultValue="finetuning" className="w-full">
         <TabsList>
           <TabsTrigger value="finetuning">
@@ -128,20 +156,34 @@ export default function AgentPage({ params }: AgentPageProps) {
             <CardHeader>
               <CardTitle>Submit New Fine-tuning Job</CardTitle>
               <CardDescription>
-                Provide triplet data to create a new version of your agent
-                model.
+                Upload a JSONL file containing triplet data for fine-tuning.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="grid w-full gap-2">
-                <Label htmlFor="triplet-data">Triplet JSON Data</Label>
-                <Textarea id="triplet-data" placeholder={`[ ... ]`} rows={8} />
+                <Label htmlFor="triplet-file">Triplet JSONL File</Label>
+                <Input
+                  id="triplet-file"
+                  type="file"
+                  accept=".jsonl"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    setSelectedFile(file || null);
+                  }}
+                />
+                {selectedFile && (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    選択中: {selectedFile.name}
+                  </p>
+                )}
               </div>
-              <Button>
-                <Rocket className="mr-2 h-4 w-4" /> Start Job
+              <Button onClick={handleStartJob} disabled={uploading}>
+                <Rocket className="mr-2 h-4 w-4" />
+                {uploading ? "Uploading..." : "Start Job"}
               </Button>
             </CardContent>
           </Card>
+
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Job History</CardTitle>
@@ -170,9 +212,7 @@ export default function AgentPage({ params }: AgentPageProps) {
                       <TableCell className="font-mono text-primary">
                         {job.id}
                       </TableCell>
-                      <TableCell className="font-mono">
-                        {job.modelId}
-                      </TableCell>
+                      <TableCell className="font-mono">{job.modelId}</TableCell>
                       <TableCell>
                         <Badge
                           variant={
@@ -223,9 +263,7 @@ export default function AgentPage({ params }: AgentPageProps) {
                       <TableCell>
                         <Badge
                           variant={
-                            dep.status === "active"
-                              ? "outline"
-                              : "secondary"
+                            dep.status === "active" ? "outline" : "secondary"
                           }
                         >
                           <span
@@ -297,4 +335,3 @@ export default function AgentPage({ params }: AgentPageProps) {
     </div>
   );
 }
-
