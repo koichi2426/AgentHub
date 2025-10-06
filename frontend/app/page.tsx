@@ -33,7 +33,8 @@ export default function HomePage() {
             <h1 className="text-2xl font-semibold">Home</h1>
             <Card>
               <CardHeader>
-                <CardTitle>Your Agents</CardTitle>
+                {/* ▼ここを「Your Agents」→「みんなのエージェント」に変更 */}
+                <CardTitle>Feed</CardTitle>
               </CardHeader>
               <CardContent>
                 <ul className="space-y-4">
@@ -42,8 +43,9 @@ export default function HomePage() {
                       <div className="flex items-center gap-2">
                         {/* Public/Private の区別をなくし、Bot アイコンに統一 */}
                         <Bot className="w-4 h-4"/>
-                        <Link href="#" className="text-xl font-bold text-blue-500 hover:underline">
-                          {agent.name}
+                        {/* ▼表示名を owner/name に変更（サイドバーと統一） */}
+                        <Link href="#" className="text-xl font-bold text-blue-500 hover:underline truncate">
+                          {agent.owner}/{agent.name}
                         </Link>
                         {/* Public/Private の Badge を削除 */}
                       </div>
@@ -65,4 +67,3 @@ export default function HomePage() {
     </div>
   );
 }
-

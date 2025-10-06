@@ -106,7 +106,8 @@ export default function AgentPage({ params }: AgentPageProps) {
         <p className="mt-2 text-muted-foreground">{agent.description}</p>
       </div>
 
-      <Tabs defaultValue="api" className="w-full">
+      {/* ↓↓ ここのdefaultValueを "finetuning" に変更しました ↓↓ */}
+      <Tabs defaultValue="finetuning" className="w-full">
         <TabsList>
           <TabsTrigger value="finetuning">
             <Rocket className="mr-2 h-4 w-4" />
@@ -157,7 +158,6 @@ export default function AgentPage({ params }: AgentPageProps) {
                 </TableHeader>
                 <TableBody>
                   {agentJobs.map((job) => (
-                    // ↓↓ TableRow全体をクリッカブルに修正しました ↓↓
                     <TableRow
                       key={job.id}
                       className="cursor-pointer hover:bg-muted/50"
