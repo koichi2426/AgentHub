@@ -1,33 +1,15 @@
-"use client"; // Stateやインタラクションを扱うためClient Componentに
-
-import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation"; // useRouterをインポート
+import { notFound } from "next/navigation";
+import Link from "next/link";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
+  CardDescription,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Bot,
-  Cpu,
-  Rocket,
-  Settings,
-  Info,
-  Play,
-  Terminal,
-} from "lucide-react";
-import Link from "next/link";
-import users from "@/lib/mocks/users.json";
-import agents from "@/lib/mocks/agents.json";
-import jobs from "@/lib/mocks/finetuning_jobs.json";
-import deployments from "@/lib/mocks/deployments.json";
-import { User, Agent } from "@/lib/data";
-import { notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Cpu, Rocket, Settings } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
 import {
   Table,
   TableBody,
@@ -36,94 +18,52 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
 
-type AgentPageProps = {
-  params: {
-    username: string;
-    agentname: string;
-  };
-};
+import users from "@/lib/mocks/users.json";
+import agents from "@/lib/mocks/agents.json";
+import jobs from "@/lib/mocks/finetuning_jobs.json";
+import deployments from "@/lib/mocks/deployments.json";
 
-export default function AgentPage({ params }: AgentPageProps) {
-  const router = useRouter();
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
+import FineTuningUploader from "@/components/fine-tuning-uploader";
+import JobHistoryTable from "@/components/job-history-table"; // ← 新規クライアントコンポーネント
 
-  const { user, agent } = useMemo(() => {
-    const foundUser = users.find(
-      (u) => u.name.toLowerCase() === params.username.toLowerCase()
-    );
-    const foundAgent = agents.find(
-      (a) =>
-        a.owner.toLowerCase() === params.username.toLowerCase() &&
-        a.name.toLowerCase() === params.agentname.toLowerCase()
-    );
-    return { user: foundUser, agent: foundAgent };
-  }, [params.username, params.agentname]);
+export default async function AgentPage({
+  params: rawParams,
+}: {
+  params:
+    | { username: string; agentname: string }
+    | Promise<{ username: string; agentname: string }>;
+}) {
+  // ★ params 非同期対応
+  const resolvedParams = await Promise.resolve(rawParams);
+  const { username, agentname } = resolvedParams;
 
-  if (!user || !agent) {
-    notFound();
-  }
+  const lowerUsername = username.toLowerCase();
+  const lowerAgentname = agentname.toLowerCase();
 
-  const { agentJobs, agentDeployments } = useMemo(() => {
-    if (!agent) return { agentJobs: [], agentDeployments: [] };
+  // データ探索
+  const user = users.find((u) => u.name.toLowerCase() === lowerUsername);
+  const agent = agents.find(
+    (a) =>
+      a.owner.toLowerCase() === lowerUsername &&
+      a.name.toLowerCase() === lowerAgentname
+  );
 
-    const filteredJobs = jobs.filter((job) => job.agentId === agent.id);
-    const modelIds = [
-      `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`,
-      ...filteredJobs.map((j) => j.modelId),
-    ];
-    const filteredDeployments = deployments.filter((dep) =>
-      modelIds.includes(dep.modelId)
-    );
-    return { agentJobs: filteredJobs, agentDeployments: filteredDeployments };
-  }, [agent]);
+  if (!user || !agent) notFound();
 
-  // --- JSONLファイル送信処理 ---
-  const handleStartJob = async () => {
-    if (!selectedFile) {
-      alert("ファイルを選択してください。");
-      return;
-    }
-
-    setUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("agentId", agent?.id ?? "");
-
-      const res = await fetch("/api/finetuning", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!res.ok) {
-        throw new Error("ファイル送信に失敗しました");
-      }
-
-      alert("ファインチューニングジョブが開始されました。");
-      setSelectedFile(null);
-    } catch (e: any) {
-      alert(e.message || "エラーが発生しました。");
-    } finally {
-      setUploading(false);
-    }
-  };
+  const agentJobs = jobs.filter((job) => job.agentId === agent.id);
+  const modelIds = [
+    `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`,
+    ...agentJobs.map((j) => j.modelId),
+  ];
+  const agentDeployments = deployments.filter((dep) =>
+    modelIds.includes(dep.modelId)
+  );
 
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
+      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-normal">
           <Link href={`/${user.name}`} className="text-primary hover:underline">
@@ -135,6 +75,7 @@ export default function AgentPage({ params }: AgentPageProps) {
         <p className="mt-2 text-muted-foreground">{agent.description}</p>
       </div>
 
+      {/* Tabs */}
       <Tabs defaultValue="finetuning" className="w-full">
         <TabsList>
           <TabsTrigger value="finetuning">
@@ -151,90 +92,27 @@ export default function AgentPage({ params }: AgentPageProps) {
           </TabsTrigger>
         </TabsList>
 
+        {/* Fine-tuning タブ */}
         <TabsContent value="finetuning" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Submit New Fine-tuning Job</CardTitle>
-              <CardDescription>
-                Upload a JSONL file containing triplet data for fine-tuning.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid w-full gap-2">
-                <Label htmlFor="triplet-file">Triplet JSONL File</Label>
-                <Input
-                  id="triplet-file"
-                  type="file"
-                  accept=".jsonl"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    setSelectedFile(file || null);
-                  }}
-                />
-                {selectedFile && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    選択中: {selectedFile.name}
-                  </p>
-                )}
-              </div>
-              <Button onClick={handleStartJob} disabled={uploading}>
-                <Rocket className="mr-2 h-4 w-4" />
-                {uploading ? "Uploading..." : "Start Job"}
-              </Button>
-            </CardContent>
-          </Card>
+          {/* JSONLアップローダ */}
+          <FineTuningUploader agentId={agent.id} />
 
+          {/* Job 履歴テーブル */}
           <Card className="mt-6">
             <CardHeader>
               <CardTitle>Job History</CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Job ID</TableHead>
-                    <TableHead>Model ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agentJobs.map((job) => (
-                    <TableRow
-                      key={job.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() =>
-                        router.push(
-                          `/${user.name}/${agent.name}/finetuning/${job.id}`
-                        )
-                      }
-                    >
-                      <TableCell className="font-mono text-primary">
-                        {job.id}
-                      </TableCell>
-                      <TableCell className="font-mono">{job.modelId}</TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            job.status === "completed"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(job.createdAt).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+              <JobHistoryTable
+                jobs={agentJobs}
+                username={user.name}
+                agentname={agent.name}
+              />
             </CardContent>
           </Card>
         </TabsContent>
 
+        {/* Deployments タブ */}
         <TabsContent value="api" className="mt-6">
           <Card>
             <CardHeader>
@@ -251,7 +129,6 @@ export default function AgentPage({ params }: AgentPageProps) {
                     <TableHead>Status</TableHead>
                     <TableHead>Endpoint</TableHead>
                     <TableHead className="text-center">Activate</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -282,44 +159,6 @@ export default function AgentPage({ params }: AgentPageProps) {
                       <TableCell className="text-center">
                         <Switch checked={dep.status === "active"} />
                       </TableCell>
-                      <TableCell className="text-right">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Play className="mr-2 h-4 w-4" /> Test
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Test API Endpoint</DialogTitle>
-                              <DialogDescription className="font-mono text-xs pt-2">
-                                {dep.endpoint}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="prompt">Prompt</Label>
-                                <Input
-                                  id="prompt"
-                                  placeholder="Enter your test prompt..."
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Response</Label>
-                                <div className="w-full rounded-md bg-muted p-4 font-mono text-xs h-32">
-                                  {/* API response will appear here */}
-                                </div>
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button>
-                                <Terminal className="mr-2 h-4 w-4" /> Send
-                                Request
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
@@ -328,6 +167,7 @@ export default function AgentPage({ params }: AgentPageProps) {
           </Card>
         </TabsContent>
 
+        {/* Settings タブ */}
         <TabsContent value="settings" className="mt-6">
           <p>Settings...</p>
         </TabsContent>
