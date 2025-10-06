@@ -25,7 +25,7 @@ export default function FineTuningUploader({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
-  const handleUpload = async () => {
+  const handleUpload = async (): Promise<void> => {
     if (!selectedFile) {
       alert("JSONLファイルを選択してください。");
       return;
@@ -46,8 +46,12 @@ export default function FineTuningUploader({
 
       alert("ジョブを送信しました。");
       setSelectedFile(null);
-    } catch (e: any) {
-      alert(e.message);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error
+          ? err.message
+          : "予期しないエラーが発生しました。";
+      alert(message);
     } finally {
       setUploading(false);
     }
@@ -68,7 +72,7 @@ export default function FineTuningUploader({
             id="triplet-file"
             type="file"
             accept=".jsonl"
-            onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+            onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
           />
           {selectedFile && (
             <p className="text-sm text-muted-foreground mt-1">

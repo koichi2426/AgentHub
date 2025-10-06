@@ -1,50 +1,55 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-} from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Cpu, Rocket, Settings } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
 
 import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
-import jobs from "@/lib/mocks/finetuning_jobs.json";
-import deployments from "@/lib/mocks/deployments.json";
+import rawJobs from "@/lib/mocks/finetuning_jobs.json";
+import rawDeployments from "@/lib/mocks/deployments.json";
 
-import FineTuningUploader from "@/components/fine-tuning-uploader";
-import JobHistoryTable from "@/components/job-history-table"; // ← 新規クライアントコンポーネント
+import AgentTabFineTuning from "@/components/agent-tabs/agent-tab-finetuning";
+import AgentTabDeployments from "@/components/agent-tabs/agent-tab-deployments";
+import AgentTabSettings from "@/components/agent-tabs/agent-tab-settings";
+
+import type { User, Agent, FinetuningJob, Deployment } from "@/lib/data";
+
+// ページパラメータ型
+type Params = { username: string; agentname: string };
+
+// JSON モックデータを厳密に型変換（status などを安全にキャスト）
+const jobs: FinetuningJob[] = (rawJobs as unknown as FinetuningJob[]).map(
+  (job) => ({
+    ...job,
+    status: job.status as "completed" | "running" | "failed",
+    finishedAt: job.finishedAt ?? undefined,
+  })
+);
+
+const deployments: Deployment[] = (
+  rawDeployments as unknown as Deployment[]
+).map((dep) => ({
+  ...dep,
+  status: dep.status as "active" | "inactive",
+}));
 
 export default async function AgentPage({
   params: rawParams,
 }: {
-  params:
-    | { username: string; agentname: string }
-    | Promise<{ username: string; agentname: string }>;
+  params: Params | Promise<Params>;
 }) {
-  // ★ params 非同期対応
   const resolvedParams = await Promise.resolve(rawParams);
   const { username, agentname } = resolvedParams;
 
   const lowerUsername = username.toLowerCase();
   const lowerAgentname = agentname.toLowerCase();
 
-  // データ探索
-  const user = users.find((u) => u.name.toLowerCase() === lowerUsername);
-  const agent = agents.find(
+  // --- 対応するユーザーとエージェントを検索 ---
+  const user: User | undefined = (users as User[]).find(
+    (u) => u.name.toLowerCase() === lowerUsername
+  );
+
+  const agent: Agent | undefined = (agents as Agent[]).find(
     (a) =>
       a.owner.toLowerCase() === lowerUsername &&
       a.name.toLowerCase() === lowerAgentname
@@ -52,18 +57,24 @@ export default async function AgentPage({
 
   if (!user || !agent) notFound();
 
-  const agentJobs = jobs.filter((job) => job.agentId === agent.id);
+  // --- エージェントに紐づくジョブとデプロイメントを抽出 ---
+  const agentJobs: FinetuningJob[] = jobs.filter(
+    (job) => job.agentId === agent.id
+  );
+
   const modelIds = [
     `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`,
     ...agentJobs.map((j) => j.modelId),
   ];
-  const agentDeployments = deployments.filter((dep) =>
+
+  const agentDeployments: Deployment[] = deployments.filter((dep) =>
     modelIds.includes(dep.modelId)
   );
 
+  // --- JSX 出力 ---
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
-      {/* Header */}
+      {/* --- ヘッダー --- */}
       <div className="mb-8">
         <h1 className="text-2xl font-normal">
           <Link href={`/${user.name}`} className="text-primary hover:underline">
@@ -75,7 +86,7 @@ export default async function AgentPage({
         <p className="mt-2 text-muted-foreground">{agent.description}</p>
       </div>
 
-      {/* Tabs */}
+      {/* --- タブ --- */}
       <Tabs defaultValue="finetuning" className="w-full">
         <TabsList>
           <TabsTrigger value="finetuning">
@@ -92,84 +103,19 @@ export default async function AgentPage({
           </TabsTrigger>
         </TabsList>
 
-        {/* Fine-tuning タブ */}
+        {/* --- Fine-tuning タブ --- */}
         <TabsContent value="finetuning" className="mt-6">
-          {/* JSONLアップローダ */}
-          <FineTuningUploader agentId={agent.id} />
-
-          {/* Job 履歴テーブル */}
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Job History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <JobHistoryTable
-                jobs={agentJobs}
-                username={user.name}
-                agentname={agent.name}
-              />
-            </CardContent>
-          </Card>
+          <AgentTabFineTuning user={user} agent={agent} jobs={agentJobs} />
         </TabsContent>
 
-        {/* Deployments タブ */}
+        {/* --- Deployments タブ --- */}
         <TabsContent value="api" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Model Deployments</CardTitle>
-              <CardDescription>
-                Manage and test API endpoints for your fine-tuned models.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Model ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Endpoint</TableHead>
-                    <TableHead className="text-center">Activate</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agentDeployments.map((dep) => (
-                    <TableRow key={dep.id}>
-                      <TableCell className="font-mono font-medium">
-                        {dep.modelId}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            dep.status === "active" ? "outline" : "secondary"
-                          }
-                        >
-                          <span
-                            className={`mr-2 h-2 w-2 rounded-full ${
-                              dep.status === "active"
-                                ? "bg-green-500"
-                                : "bg-gray-500"
-                            }`}
-                          ></span>
-                          {dep.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {dep.endpoint}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch checked={dep.status === "active"} />
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <AgentTabDeployments deployments={agentDeployments} />
         </TabsContent>
 
-        {/* Settings タブ */}
+        {/* --- Settings タブ --- */}
         <TabsContent value="settings" className="mt-6">
-          <p>Settings...</p>
+          <AgentTabSettings agent={agent} />
         </TabsContent>
       </Tabs>
     </div>
