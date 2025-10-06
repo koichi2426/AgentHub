@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
   Card,
   CardHeader,
@@ -21,9 +22,15 @@ import type { Deployment } from "@/lib/data";
 
 export default function AgentTabDeployments({
   deployments,
+  username,
+  agentname,
 }: {
   deployments: Deployment[];
+  username: string;
+  agentname: string;
 }) {
+  const router = useRouter();
+
   return (
     <Card>
       <CardHeader>
@@ -44,8 +51,14 @@ export default function AgentTabDeployments({
           </TableHeader>
           <TableBody>
             {deployments.map((dep) => (
-              <TableRow key={dep.id}>
-                <TableCell className="font-mono font-medium">
+              <TableRow
+                key={dep.id}
+                className="cursor-pointer hover:bg-muted/50 transition-colors"
+                onClick={() =>
+                  router.push(`/${username}/${agentname}/deployments/${dep.id}`)
+                }
+              >
+                <TableCell className="font-mono font-medium text-primary">
                   {dep.modelId}
                 </TableCell>
                 <TableCell>

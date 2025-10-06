@@ -110,7 +110,7 @@ export default async function AgentPage({
 
         {/* --- Deployments タブ --- */}
         <TabsContent value="api" className="mt-6">
-          <AgentTabDeployments deployments={agentDeployments} />
+          <AgentTabDeployments deployments={agentDeployments} username={user.name} agentname={agent.name}/>
         </TabsContent>
 
         {/* --- Settings タブ --- */}
