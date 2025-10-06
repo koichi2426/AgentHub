@@ -17,7 +17,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
 import type { Deployment } from "@/lib/data";
 
 export default function AgentTabDeployments({
@@ -36,7 +35,7 @@ export default function AgentTabDeployments({
       <CardHeader>
         <CardTitle>Model Deployments</CardTitle>
         <CardDescription>
-          Manage and test API endpoints for your fine-tuned models.
+          View and access API endpoints for your fine-tuned models.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -46,7 +45,6 @@ export default function AgentTabDeployments({
               <TableHead>Model ID</TableHead>
               <TableHead>Status</TableHead>
               <TableHead>Endpoint</TableHead>
-              <TableHead className="text-center">Activate</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -77,9 +75,6 @@ export default function AgentTabDeployments({
                 </TableCell>
                 <TableCell className="font-mono text-xs">
                   {dep.endpoint}
-                </TableCell>
-                <TableCell className="text-center">
-                  <Switch checked={dep.status === "active"} />
                 </TableCell>
               </TableRow>
             ))}
