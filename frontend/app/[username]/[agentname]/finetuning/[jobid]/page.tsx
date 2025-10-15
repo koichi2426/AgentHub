@@ -18,11 +18,21 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { ArrowLeft, Bot, Calendar, CheckCircle, Clock, Download } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Bot, Calendar, CheckCircle, Clock, Download, Trash2 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
-// ★★★ ここを修正しました ★★★
-// 必要なモックJSONファイルのみをインポート
 import agents from "@/lib/mocks/agents.json";
 import jobs from "@/lib/mocks/finetuning_jobs.json";
 import trainingDataLinks from "@/lib/mocks/training_data_links.json"; 
@@ -40,9 +50,8 @@ type JobDetailPageProps = {
 
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const [selectedImage, setSelectedImage] = useState<{ url: string; name: string } | null>(null);
+  const router = useRouter();
 
-  // ★★★ ここを修正しました ★★★
-  // useMemoフック内で、全ての関連データをjobIdをキーに検索
   const { agent, job, trainingLink, visualizations } = useMemo(() => {
     const foundJob = jobs.find((j) => j.id === params.jobid);
     if (!foundJob) {
@@ -65,10 +74,15 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     };
   }, [params.username, params.agentname, params.jobid]);
 
-  // agentかjobが見つからなければ404ページを表示
   if (!agent || !job) {
     notFound();
   }
+
+  const handleDeleteModel = () => {
+    console.log(`Deleting model: ${job.modelId} associated with job: ${job.id}`);
+    alert(`モデル「${job.modelId}」を削除しました。(シミュレーション)`);
+    router.push(`/${params.username}/${params.agentname}`);
+  };
 
   const getDownloadFileName = (url: string, baseName: string) => {
     const extMatch = url.match(/\.(jpeg|jpg|gif|png)$/);
@@ -115,7 +129,6 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             </CardContent>
           </Card>
           
-          {/* ★★★ ここを修正しました ★★★ */}
           <Card className="md:col-span-2">
             <CardHeader>
               <CardTitle>Training Data Used</CardTitle>
@@ -140,8 +153,6 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
           </Card>
         </div>
 
-        {/* ★★★ ここを修正しました ★★★ */}
-        {/* visualizationsデータが存在する場合のみ、このセクションを表示 */}
         {visualizations && (
           <div className="mt-6">
             <Card>
@@ -181,6 +192,41 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             </Card>
           </div>
         )}
+
+        <div className="mt-6">
+          <Card className="border-destructive">
+            <CardHeader>
+              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardDescription>
+                この操作は元に戻すことができません。注意して実行してください。
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete This Model
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      モデル <span className="font-mono font-semibold">{job.modelId}</span> を完全に削除します。この操作は取り消せません。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDeleteModel}>
+                      削除を実行
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       <Dialog open={!!selectedImage} onOpenChange={(isOpen) => !isOpen && setSelectedImage(null)}>
