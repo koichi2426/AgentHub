@@ -15,7 +15,7 @@ import { Rocket } from "lucide-react";
 
 /**
  * fine-tuning-uploader.tsx
- * Triplet JSONL ファイルを選択し、/api/finetuning に送信するコンポーネント
+ * ★★★ テキストファイルを選択し、/api/finetuning に送信するコンポーネント ★★★
  */
 export default function FineTuningUploader({
   agentId,
@@ -27,7 +27,8 @@ export default function FineTuningUploader({
 
   const handleUpload = async (): Promise<void> => {
     if (!selectedFile) {
-      alert("JSONLファイルを選択してください。");
+      // ★★★ アラートメッセージを修正 ★★★
+      alert("テキストファイルを選択してください。");
       return;
     }
 
@@ -61,17 +62,20 @@ export default function FineTuningUploader({
     <Card>
       <CardHeader>
         <CardTitle>Submit New Fine-tuning Job</CardTitle>
+        {/* ★★★ 説明文を修正 ★★★ */}
         <CardDescription>
-          Upload a JSONL file containing triplet data for fine-tuning.
+          Upload a Text file containing training data for fine-tuning.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid w-full gap-2">
-          <Label htmlFor="triplet-file">Triplet JSONL File</Label>
+          {/* ★★★ ラベルとIDを修正 ★★★ */}
+          <Label htmlFor="training-data-file">Training Data File (.txt)</Label>
           <Input
-            id="triplet-file"
+            id="training-data-file"
             type="file"
-            accept=".jsonl"
+            // ★★★ accept属性を修正 ★★★
+            accept=".txt"
             onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
           />
           {selectedFile && (
