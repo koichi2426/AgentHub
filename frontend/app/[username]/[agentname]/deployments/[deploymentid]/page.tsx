@@ -3,12 +3,24 @@
 import { useState } from "react";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Terminal, Upload, Power } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Upload, Power, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
@@ -26,6 +38,7 @@ export default function DeploymentDetailPage({
   };
 }) {
   const { username, agentname, deploymentid } = params;
+  const router = useRouter();
 
   const lowerUsername = username.toLowerCase();
   const lowerAgentname = agentname.toLowerCase();
@@ -67,8 +80,6 @@ export default function DeploymentDetailPage({
   const toggleApiStatus = async () => {
     const nextStatus = apiStatus === "active" ? "inactive" : "active";
     setApiStatus(nextStatus);
-
-    // モック挙動（実際にはAPI呼び出し）
     await new Promise((resolve) => setTimeout(resolve, 500));
     alert(
       `API を${nextStatus === "active" ? "起動" : "停止"}しました（モック）`
@@ -78,21 +89,17 @@ export default function DeploymentDetailPage({
   // --- テスト送信関数 ---
   const handleTest = async () => {
     if (!selectedFile) {
-      alert("JSONLファイルを選択してください。");
+      // ★★★ アラートメッセージを修正 ★★★
+      alert("TXTファイルを選択してください。");
       return;
     }
-
     setTesting(true);
     setTestResult(null);
-
     try {
       const formData = new FormData();
       formData.append("file", selectedFile);
       formData.append("deploymentId", deployment.id);
-
-      // 本来ならAPIにPOSTするが、ここでは擬似レスポンス
       await new Promise((resolve) => setTimeout(resolve, 1500));
-
       setTestResult("✅ テスト送信が完了しました（モック実行）");
       setSelectedFile(null);
     } catch (err: unknown) {
@@ -104,6 +111,13 @@ export default function DeploymentDetailPage({
     } finally {
       setTesting(false);
     }
+  };
+
+  // --- デプロイメント削除処理のハンドラ ---
+  const handleDeleteDeployment = () => {
+    console.log(`Deleting deployment: ${deployment.id}`);
+    alert(`デプロイメント「${deployment.id}」を削除しました。(シミュレーション)`);
+    router.push(`/${username}/${agentname}`);
   };
 
   // --- UI ---
@@ -137,87 +151,91 @@ export default function DeploymentDetailPage({
           <div className="grid grid-cols-2 gap-y-2">
             <div className="text-sm text-muted-foreground">Model ID</div>
             <div className="font-mono">{deployment.modelId}</div>
-
             <div className="text-sm text-muted-foreground">Status</div>
             <div>
-              <Badge
-                variant={apiStatus === "active" ? "outline" : "secondary"}
-              >
-                <span
-                  className={`mr-2 h-2 w-2 rounded-full ${
-                    apiStatus === "active" ? "bg-green-500" : "bg-gray-500"
-                  }`}
-                ></span>
+              <Badge variant={apiStatus === "active" ? "outline" : "secondary"}>
+                <span className={`mr-2 h-2 w-2 rounded-full ${apiStatus === "active" ? "bg-green-500" : "bg-gray-500"}`}></span>
                 {apiStatus}
               </Badge>
             </div>
-
             <div className="text-sm text-muted-foreground">Endpoint</div>
-            <div className="font-mono text-xs break-all">
-              {deployment.endpoint}
-            </div>
-
+            <div className="font-mono text-xs break-all">{deployment.endpoint}</div>
             <div className="text-sm text-muted-foreground">Created At</div>
             <div>{new Date(deployment.createdAt).toLocaleString()}</div>
           </div>
 
-          {/* --- API起動/停止切り替えボタン --- */}
+          {/* API起動/停止切り替えボタン */}
           <div className="pt-2">
-            <Button
-              variant={apiStatus === "active" ? "destructive" : "default"}
-              onClick={toggleApiStatus}
-            >
+            <Button variant={apiStatus === "active" ? "destructive" : "default"} onClick={toggleApiStatus}>
               <Power className="mr-2 h-4 w-4" />
               {apiStatus === "active" ? "Stop API" : "Start API"}
             </Button>
           </div>
 
-          {/* --- テストセクション --- */}
+          {/* ★★★ ここからテストセクションのテキストとInput属性を修正 ★★★ */}
           <div className="pt-6 border-t mt-4">
-            <h3 className="font-semibold mb-2">Test with JSONL Data</h3>
+            <h3 className="font-semibold mb-2">Test with Text Data</h3>
             <p className="text-sm text-muted-foreground mb-4">
-              Upload a JSONL file containing test data to simulate inference.
+              Upload a Text file containing test data to simulate inference.
             </p>
 
             <div className="grid gap-3">
-              <Label htmlFor="test-jsonl">Test File (.jsonl)</Label>
+              <Label htmlFor="test-txt">Test File (.txt)</Label>
               <Input
-                id="test-jsonl"
+                id="test-txt"
                 type="file"
-                accept=".jsonl"
+                accept=".txt"
                 onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
               />
-              {selectedFile && (
-                <p className="text-xs text-muted-foreground mt-1">
-                  選択中: {selectedFile.name}
-                </p>
-              )}
-
+              {selectedFile && <p className="text-xs text-muted-foreground mt-1">選択中: {selectedFile.name}</p>}
               <Button onClick={handleTest} disabled={testing}>
                 <Upload className="mr-2 h-4 w-4" />
                 {testing ? "Testing..." : "Start Test"}
               </Button>
-
-              {testResult && (
-                <div className="text-sm text-muted-foreground mt-3 border-t pt-2">
-                  {testResult}
-                </div>
-              )}
+              {testResult && <div className="text-sm text-muted-foreground mt-3 border-t pt-2">{testResult}</div>}
             </div>
           </div>
+          {/* ★★★ 修正ここまで ★★★ */}
 
-          {/* --- APIコンソールセクション --- */}
-          <div className="pt-8 border-t mt-6">
-            <h3 className="font-semibold mb-2">API Console (Mock)</h3>
-            <p className="text-sm text-muted-foreground mb-4">
-              API execution is not available in this demo.
-            </p>
-            <Button variant="outline" disabled>
-              <Terminal className="mr-2 h-4 w-4" /> Open API Console
-            </Button>
-          </div>
         </CardContent>
       </Card>
+
+      {/* Danger Zone */}
+      <div className="mt-6">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Danger Zone</CardTitle>
+            <CardDescription>
+              この操作は元に戻すことができません。注意して実行してください。
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete This Deployment
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>本当に削除しますか？</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    デプロイメント <span className="font-mono font-semibold">{deployment.id}</span> を完全に削除します。この操作は取り消せません。
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>キャンセル</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteDeployment}>
+                    削除を実行
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </CardContent>
+        </Card>
+      </div>
+      
     </div>
   );
 }
