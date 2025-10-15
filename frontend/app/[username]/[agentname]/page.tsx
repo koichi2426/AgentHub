@@ -1,103 +1,83 @@
-"use client"; // Stateやインタラクションを扱うためClient Componentに
-
-import { useMemo } from "react";
-import { useRouter } from "next/navigation"; // useRouterをインポート
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Bot,
-  Cpu,
-  Rocket,
-  Settings,
-  Info,
-  Play,
-  Terminal,
-} from "lucide-react";
+import { notFound } from "next/navigation";
 import Link from "next/link";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Cpu, Rocket, Settings } from "lucide-react";
+
 import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
-import jobs from "@/lib/mocks/finetuning_jobs.json";
-import deployments from "@/lib/mocks/deployments.json";
-import { User, Agent } from "@/lib/data";
-import { notFound } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-  DialogFooter,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import rawJobs from "@/lib/mocks/finetuning_jobs.json";
+import rawDeployments from "@/lib/mocks/deployments.json";
 
-type AgentPageProps = {
-  params: {
-    username: string;
-    agentname: string;
-  };
-};
+import AgentTabFineTuning from "@/components/agent-tabs/agent-tab-finetuning";
+import AgentTabDeployments from "@/components/agent-tabs/agent-tab-deployments";
+import AgentTabSettings from "@/components/agent-tabs/agent-tab-settings";
 
-export default function AgentPage({ params }: AgentPageProps) {
-  const router = useRouter(); // useRouterフックを初期化
+import type { User, Agent, FinetuningJob, Deployment } from "@/lib/data";
 
-  const { user, agent } = useMemo(() => {
-    const foundUser = users.find(
-      (u) => u.name.toLowerCase() === params.username.toLowerCase()
-    );
-    const foundAgent = agents.find(
-      (a) =>
-        a.owner.toLowerCase() === params.username.toLowerCase() &&
-        a.name.toLowerCase() === params.agentname.toLowerCase()
-    );
-    return { user: foundUser, agent: foundAgent };
-  }, [params.username, params.agentname]);
+// ページパラメータ型
+type Params = { username: string; agentname: string };
 
-  if (!user || !agent) {
-    notFound();
-  }
+// JSON モックデータを厳密に型変換（status などを安全にキャスト）
+const jobs: FinetuningJob[] = (rawJobs as unknown as FinetuningJob[]).map(
+  (job) => ({
+    ...job,
+    status: job.status as "completed" | "running" | "failed",
+    finishedAt: job.finishedAt ?? undefined,
+  })
+);
 
-  const { agentJobs, agentDeployments } = useMemo(() => {
-    if (!agent) return { agentJobs: [], agentDeployments: [] };
+const deployments: Deployment[] = (
+  rawDeployments as unknown as Deployment[]
+).map((dep) => ({
+  ...dep,
+  status: dep.status as "active" | "inactive",
+}));
 
-    const filteredJobs = jobs.filter((job) => job.agentId === agent.id);
-    const modelIds = [
-      `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`,
-      ...filteredJobs.map((j) => j.modelId),
-    ];
-    const filteredDeployments = deployments.filter((dep) =>
-      modelIds.includes(dep.modelId)
-    );
-    return { agentJobs: filteredJobs, agentDeployments: filteredDeployments };
-  }, [agent]);
+export default async function AgentPage({
+  params: rawParams,
+}: {
+  params: Params | Promise<Params>;
+}) {
+  const resolvedParams = await Promise.resolve(rawParams);
+  const { username, agentname } = resolvedParams;
 
+  const lowerUsername = username.toLowerCase();
+  const lowerAgentname = agentname.toLowerCase();
+
+  // --- 対応するユーザーとエージェントを検索 ---
+  const user: User | undefined = (users as User[]).find(
+    (u) => u.name.toLowerCase() === lowerUsername
+  );
+
+  const agent: Agent | undefined = (agents as Agent[]).find(
+    (a) =>
+      a.owner.toLowerCase() === lowerUsername &&
+      a.name.toLowerCase() === lowerAgentname
+  );
+
+  if (!user || !agent) notFound();
+
+  // --- エージェントに紐づくジョブとデプロイメントを抽出 ---
+  const agentJobs: FinetuningJob[] = jobs.filter(
+    (job) => job.agentId === agent.id
+  );
+
+  const modelIds = [
+    `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`,
+    ...agentJobs.map((j) => j.modelId),
+  ];
+
+  const agentDeployments: Deployment[] = deployments.filter((dep) =>
+    modelIds.includes(dep.modelId)
+  );
+
+  // --- JSX 出力 ---
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
+      {/* --- ヘッダー --- */}
       <div className="mb-8">
         <h1 className="text-2xl font-normal">
-          <Link
-            href={`/${user.name}`}
-            className="text-primary hover:underline"
-          >
+          <Link href={`/${user.name}`} className="text-primary hover:underline">
             {user.name}
           </Link>
           <span className="mx-2 text-muted-foreground">/</span>
@@ -106,7 +86,8 @@ export default function AgentPage({ params }: AgentPageProps) {
         <p className="mt-2 text-muted-foreground">{agent.description}</p>
       </div>
 
-      <Tabs defaultValue="api" className="w-full">
+      {/* --- タブ --- */}
+      <Tabs defaultValue="finetuning" className="w-full">
         <TabsList>
           <TabsTrigger value="finetuning">
             <Rocket className="mr-2 h-4 w-4" />
@@ -122,179 +103,21 @@ export default function AgentPage({ params }: AgentPageProps) {
           </TabsTrigger>
         </TabsList>
 
+        {/* --- Fine-tuning タブ --- */}
         <TabsContent value="finetuning" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Submit New Fine-tuning Job</CardTitle>
-              <CardDescription>
-                Provide triplet data to create a new version of your agent
-                model.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid w-full gap-2">
-                <Label htmlFor="triplet-data">Triplet JSON Data</Label>
-                <Textarea id="triplet-data" placeholder={`[ ... ]`} rows={8} />
-              </div>
-              <Button>
-                <Rocket className="mr-2 h-4 w-4" /> Start Job
-              </Button>
-            </CardContent>
-          </Card>
-          <Card className="mt-6">
-            <CardHeader>
-              <CardTitle>Job History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Job ID</TableHead>
-                    <TableHead>Model ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created At</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agentJobs.map((job) => (
-                    // ↓↓ TableRow全体をクリッカブルに修正しました ↓↓
-                    <TableRow
-                      key={job.id}
-                      className="cursor-pointer hover:bg-muted/50"
-                      onClick={() =>
-                        router.push(
-                          `/${user.name}/${agent.name}/finetuning/${job.id}`
-                        )
-                      }
-                    >
-                      <TableCell className="font-mono text-primary">
-                        {job.id}
-                      </TableCell>
-                      <TableCell className="font-mono">
-                        {job.modelId}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            job.status === "completed"
-                              ? "default"
-                              : "secondary"
-                          }
-                        >
-                          {job.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {new Date(job.createdAt).toLocaleString()}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <AgentTabFineTuning user={user} agent={agent} jobs={agentJobs} />
         </TabsContent>
 
+        {/* --- Deployments タブ --- */}
         <TabsContent value="api" className="mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Model Deployments</CardTitle>
-              <CardDescription>
-                Manage and test API endpoints for your fine-tuned models.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Model ID</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Endpoint</TableHead>
-                    <TableHead className="text-center">Activate</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {agentDeployments.map((dep) => (
-                    <TableRow key={dep.id}>
-                      <TableCell className="font-mono font-medium">
-                        {dep.modelId}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={
-                            dep.status === "active"
-                              ? "outline"
-                              : "secondary"
-                          }
-                        >
-                          <span
-                            className={`mr-2 h-2 w-2 rounded-full ${
-                              dep.status === "active"
-                                ? "bg-green-500"
-                                : "bg-gray-500"
-                            }`}
-                          ></span>
-                          {dep.status}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">
-                        {dep.endpoint}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Switch checked={dep.status === "active"} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Dialog>
-                          <DialogTrigger asChild>
-                            <Button variant="outline" size="sm">
-                              <Play className="mr-2 h-4 w-4" /> Test
-                            </Button>
-                          </DialogTrigger>
-                          <DialogContent>
-                            <DialogHeader>
-                              <DialogTitle>Test API Endpoint</DialogTitle>
-                              <DialogDescription className="font-mono text-xs pt-2">
-                                {dep.endpoint}
-                              </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                              <div className="space-y-2">
-                                <Label htmlFor="prompt">Prompt</Label>
-                                <Input
-                                  id="prompt"
-                                  placeholder="Enter your test prompt..."
-                                />
-                              </div>
-                              <div className="space-y-2">
-                                <Label>Response</Label>
-                                <div className="w-full rounded-md bg-muted p-4 font-mono text-xs h-32">
-                                  {/* API response will appear here */}
-                                </div>
-                              </div>
-                            </div>
-                            <DialogFooter>
-                              <Button>
-                                <Terminal className="mr-2 h-4 w-4" /> Send
-                                Request
-                              </Button>
-                            </DialogFooter>
-                          </DialogContent>
-                        </Dialog>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
+          <AgentTabDeployments deployments={agentDeployments} username={user.name} agentname={agent.name}/>
         </TabsContent>
 
+        {/* --- Settings タブ --- */}
         <TabsContent value="settings" className="mt-6">
-          <p>Settings...</p>
+          <AgentTabSettings agent={agent} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
-

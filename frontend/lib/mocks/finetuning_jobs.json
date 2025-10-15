@@ -12,7 +12,15 @@
     "agentId": "agent-1",
     "status": "running",
     "createdAt": "2024-10-05T14:00:00Z",
+    "finishedAt": null,
     "modelId": "model_abc_v3_inprogress"
+  },
+  {
+    "id": "job_003",
+    "agentId": "agent-3",
+    "status": "failed",
+    "createdAt": "2024-10-08T09:15:00Z",
+    "finishedAt": "2024-10-08T09:45:00Z",
+    "modelId": "model_internal_v1"
   }
 ]
-

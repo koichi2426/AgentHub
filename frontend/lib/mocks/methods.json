@@ -1,0 +1,26 @@
+[
+  {
+    "agentId": "agent-1",
+    "methods": [
+      "analyze_input",
+      "generate_summary",
+      "filter_candidates"
+    ]
+  },
+  {
+    "agentId": "agent-2",
+    "methods": [
+      "respond_to_query",
+      "fetch_customer_info",
+      "update_ticket_status"
+    ]
+  },
+  {
+    "agentId": "agent-3",
+    "methods": [
+      "scan_vulnerabilities",
+      "report_findings",
+      "suggest_fix"
+    ]
+  }
+]
