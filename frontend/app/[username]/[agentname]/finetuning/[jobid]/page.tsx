@@ -29,7 +29,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Bot, Calendar, CheckCircle, Clock, Download, Trash2 } from "lucide-react";
+// ★★★ Rocket アイコンをインポート ★★★
+import { ArrowLeft, Bot, Calendar, CheckCircle, Clock, Download, Rocket, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -84,6 +85,14 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     router.push(`/${params.username}/${params.agentname}`);
   };
 
+  // ★★★ デプロイ処理のハンドラを追加 ★★★
+  const handleDeployModel = () => {
+    // ここに実際のAPI呼び出しなどのデプロイロジックを実装します。
+    // 今回はモックデータなので、コンソールログとアラートでシミュレートします。
+    console.log(`Deploying model: ${job.modelId}`);
+    alert(`モデル「${job.modelId}」のデプロイを開始しました。(シミュレーション)`);
+  };
+
   const getDownloadFileName = (url: string, baseName: string) => {
     const extMatch = url.match(/\.(jpeg|jpg|gif|png)$/);
     const ext = extMatch ? extMatch[1] : 'png';
@@ -98,9 +107,20 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
           <Link href={`/${params.username}/${params.agentname}`} className="flex items-center text-sm text-muted-foreground hover:text-foreground">
             <ArrowLeft className="mr-2 h-4 w-4" />Back to {agent.name}
           </Link>
-          <div>
-            <h1 className="text-2xl font-bold">Fine-tuning Job Details</h1>
-            <p className="font-mono text-sm text-muted-foreground">{job.id}</p>
+
+          {/* ★★★ ここを修正しました (タイトルとデプロイボタンを横並びに) ★★★ */}
+          <div className="flex items-start justify-between">
+            <div>
+              <h1 className="text-2xl font-bold">Fine-tuning Job Details</h1>
+              <p className="font-mono text-sm text-muted-foreground">{job.id}</p>
+            </div>
+            {/* job.status が 'completed' の場合のみボタンを表示 */}
+            {job.status === 'completed' && (
+              <Button onClick={handleDeployModel}>
+                <Rocket className="mr-2 h-4 w-4" />
+                Deploy Model
+              </Button>
+            )}
           </div>
         </div>
 
