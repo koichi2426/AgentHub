@@ -1,0 +1,51 @@
+[
+  {
+    "jobId": "job_001",
+    "layers": [
+      {
+        "layerName": "layer0",
+        "weights": [
+          {
+            "name": "bert.encoder.layer.0.attention.output.dense.weight",
+            "before": "https://picsum.photos/seed/job001-l0-out-before/400/400",
+            "after": "https://picsum.photos/seed/job001-l0-out-after/400/400",
+            "delta": "https://picsum.photos/seed/job001-l0-out-delta/400/400"
+          },
+          {
+            "name": "bert.encoder.layer.0.attention.self.key.weight",
+            "before": "https://picsum.photos/seed/job001-l0-key-before/400/400",
+            "after": "https://picsum.photos/seed/job001-l0-key-after/400/400",
+            "delta": "https://picsum.photos/seed/job001-l0-key-delta/400/400"
+          }
+        ]
+      },
+      {
+        "layerName": "layer1",
+        "weights": [
+          {
+            "name": "bert.encoder.layer.1.attention.output.dense.weight",
+            "before": "https://picsum.photos/seed/job001-l1-out-before/400/400",
+            "after": "https://picsum.photos/seed/job001-l1-out-after/400/400",
+            "delta": "https://picsum.photos/seed/job001-l1-out-delta/400/400"
+          }
+        ]
+      }
+    ]
+  },
+  {
+    "jobId": "job_003",
+    "layers": [
+      {
+        "layerName": "layer0",
+        "weights": [
+          {
+            "name": "bert.encoder.layer.0.attention.output.dense.weight",
+            "before": "https://picsum.photos/seed/job003-l0-out-before/400/400",
+            "after": "https://picsum.photos/seed/job003-l0-out-after/400/400",
+            "delta": "https://picsum.photos/seed/job003-l0-out-delta/400/400"
+          }
+        ]
+      }
+    ]
+  }
+]

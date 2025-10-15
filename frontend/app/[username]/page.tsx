@@ -10,7 +10,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Bot, GitBranch, BookUser, Plus } from "lucide-react";
+// ★★★ GitBranch アイコンを削除 ★★★
+import { Bot, BookUser, Plus } from "lucide-react";
 import Link from "next/link";
 import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
@@ -127,12 +128,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                       <p className="text-muted-foreground">
                         {agent.description}
                       </p>
-                      <div className="mt-4 flex items-center space-x-4 text-sm text-muted-foreground">
-                        <div className="flex items-center">
-                          <GitBranch className="mr-1 h-4 w-4" />
-                          <span>Version {agent.version}</span>
-                        </div>
-                      </div>
+                      {/* ★★★ ここにあったバージョン表示のdivを削除しました ★★★ */}
                     </CardContent>
                   </Card>
                 ))}
@@ -144,4 +140,3 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     </div>
   );
 }
-
