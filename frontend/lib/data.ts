@@ -4,7 +4,6 @@ export type Agent = {
   name: string;
   owner: string;
   description: string;
-  version: string; // 最新バージョン
 };
 
 // ユーザーオブジェクトの型定義
@@ -34,8 +33,6 @@ export type Deployment = {
   endpoint: string;
   createdAt: string;
 };
-
-// ★★★ ここからが追加分です ★★★
 
 // 学習データへのリンク情報の型定義
 export type TrainingLink = {
