@@ -1,0 +1,23 @@
+[
+  {
+    "jobId": "job_001",
+    "dataUrl": "/training-data/job_001_data.txt",
+    "fileName": "job_001_training_data.txt",
+    "recordCount": 8,
+    "fileSize": "1.5 KB"
+  },
+  {
+    "jobId": "job_002",
+    "dataUrl": null,
+    "fileName": null,
+    "recordCount": null,
+    "fileSize": null
+  },
+  {
+    "jobId": "job_003",
+    "dataUrl": "/training-data/job_003_data.txt",
+    "fileName": "job_003_training_data.txt",
+    "recordCount": 5,
+    "fileSize": "0.8 KB"
+  }
+]
