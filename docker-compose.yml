@@ -11,12 +11,7 @@ services:
     container_name: agenthub_frontend
     ports:
       - "3000:3000"
-    # ★★★ ここを修正しました ★★★
-    # volumes:
-    #   - ./frontend:/app
-    #   - /app/node_modules
-    # 上記のボリュームマウントを削除またはコメントアウトします。
-    # これにより、ビルド時に作成されたファイルが上書きされなくなります。
+    # ビルド時に作成されたファイルが上書きされないようにします。
     depends_on:
       - backend
     restart: unless-stopped
@@ -36,6 +31,8 @@ services:
     depends_on:
       - db
     environment:
+      # .env ファイルから DATABASE_URL を読み込みます。
+      # .env 側で変数名 (DB_USERなど) は修正済み。
       DATABASE_URL: ${DATABASE_URL}
     restart: unless-stopped
 
@@ -46,12 +43,14 @@ services:
     image: mysql:8.0
     container_name: agenthub_db
     environment:
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      # ▼▼▼ [修正] .env ファイルの変数名に合わせる ▼▼▼
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
     ports:
-      - "${MYSQL_PORT}:3306"
+      # ▼▼▼ [修正] .env ファイルの変数名に合わせる ▼▼▼
+      - "${DB_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
@@ -62,4 +61,3 @@ services:
 # ---------------------------------
 volumes:
   mysql_data:
-
