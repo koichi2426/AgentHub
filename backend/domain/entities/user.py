@@ -12,7 +12,7 @@ class User:
     username: str
     name: str
     email: Email
-    avatar_url: Optional[str]
+    avatar_url: str
     password_hash: str  # 本来はハッシュ化したパスワードを想定
 
 
@@ -72,7 +72,7 @@ def NewUser(
     name: str,
     email: str,
     password_hash: str,
-    avatar_url: Optional[str] = None,
+    avatar_url: str,
 ) -> "User":
     # 互換性のため引数はプリミティブを受け取り内部で VO を生成する
     return User(
