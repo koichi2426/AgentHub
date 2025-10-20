@@ -12,7 +12,7 @@ export type User = {
   name: string;
   email: string;
   password_hash: string;
-  avatar_url?: string;
+  avatar_url: string;
 };
 
 // ファインチューニングジョブの型定義

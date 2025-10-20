@@ -1,13 +1,72 @@
-# AgentHub/docker-compose.yml
-
 version: '3.8'
 
 services:
+  # ---------------------------------
+  # フロントエンドサービス (Next.js)
+  # ---------------------------------
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-    container_name: nextjs_frontend
+    container_name: agenthub_frontend
     ports:
       - "3000:3000"
+    depends_on:
+      - backend
     restart: unless-stopped
+
+  # ---------------------------------
+  # バックエンドサービス (FastAPI)
+  # ---------------------------------
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: agenthub_backend
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+    depends_on:
+      # ▼▼▼ [修正] DBのhealthcheckが通ってから起動するように変更 ▼▼▼
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    restart: unless-stopped
+
+  # ---------------------------------
+  # データベースサービス (MySQL)
+  # ---------------------------------
+  db:
+    image: mysql:8.0
+    container_name: agenthub_db
+    environment:
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME}
+    ports:
+      - "${DB_PORT}:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    restart: unless-stopped
+    command: --default-authentication-plugin=mysql_native_password
+    # ▼▼▼ [追加] DBが正常に起動したかチェックする設定 ▼▼▼
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # ▲▲▲ 追加ここまで ▲▲▲
+
+# ---------------------------------
+# 名前付きボリュームの定義
+# ---------------------------------
+volumes:
+  mysql_data:
+

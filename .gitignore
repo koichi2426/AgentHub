@@ -1,0 +1,10 @@
+# 依存関係
+node_modules/
+__pycache__/
+*.pyc
+
+# 環境変数ファイル
+.env
+
+# その他
+.DS_Store
