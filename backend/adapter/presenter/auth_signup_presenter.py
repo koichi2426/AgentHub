@@ -1,24 +1,24 @@
-from usecase.auth_signup import CreateUserPresenter, CreateUserOutput, UserOutputDTO
+from typing import Dict, Any
+from usecase.auth_signup import CreateUserPresenter
 from domain.entities.user import User
 
 
 class CreateUserPresenterImpl(CreateUserPresenter):
-    def output(self, user: User) -> CreateUserOutput:
+    def output(self, user: User) -> Dict[str, Any]:
         """
-        User ドメインオブジェクトを CreateUserOutput に変換して返す。
+        UserドメインオブジェクトをJSONシリアライズ可能な辞書に変換して返す。
         """
-        dto = UserOutputDTO(
-            id=getattr(user, "id", 0),
-            username=getattr(user, "username", "") or getattr(user, "name", ""),
-            name=getattr(user, "name", ""),
-            email=getattr(user, "email", ""),
-            avatar_url=getattr(user, "avatar_url", ""),
-        )
-        return CreateUserOutput(user=dto)
+        return {
+            "id": user.id,
+            "username": user.username,
+            "name": user.name,
+            "email": user.email,
+            "avatar_url": user.avatar_url,
+        }
 
 
 def new_auth_signup_presenter() -> CreateUserPresenter:
     """
-    CreateUserPresenterImpl のファクトリ。
+    CreateUserPresenterImpl のインスタンスを生成するファクトリ関数。
     """
     return CreateUserPresenterImpl()
