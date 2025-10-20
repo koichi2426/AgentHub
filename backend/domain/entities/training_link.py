@@ -38,10 +38,16 @@ class TrainingDataRepository(abc.ABC):
 
 
 def NewTrainingLink(
-    job_id: str,
+    job_id: int,
     data_url: Optional[str],
     file_name: Optional[str],
     record_count: Optional[int],
     file_size: Optional[str],
 ) -> TrainingLink:
-    return TrainingLink(job_id=ID(job_id), data_url=data_url, file_name=file_name, record_count=record_count, file_size=file_size)
+    return TrainingLink(
+        job_id=ID(job_id),
+        data_url=data_url,
+        file_name=file_name,
+        record_count=record_count,
+        file_size=file_size,
+    )

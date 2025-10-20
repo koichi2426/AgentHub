@@ -68,17 +68,16 @@ class UserRepository(abc.ABC):
 
 
 def NewUser(
-    id: str,
-    username: str,
+    id: int,
     name: str,
     email: str,
-    avatar_url: Optional[str],
     password_hash: str,
-) -> User:
+    avatar_url: Optional[str] = None,
+) -> "User":
     # 互換性のため引数はプリミティブを受け取り内部で VO を生成する
     return User(
         id=ID(id),
-        username=username,
+        username=name,
         name=name,
         email=Email(email),
         avatar_url=avatar_url,

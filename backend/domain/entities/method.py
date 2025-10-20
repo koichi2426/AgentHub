@@ -17,7 +17,7 @@ class Method:
 
 class MethodRepository(abc.ABC):
     @abc.abstractmethod
-    def list_by_agent(self, agent_id: str) -> list[Method]:
+    def list_by_agent(self, agent_id: "ID") -> list[Method]:
         """
         指定エージェントのメソッド一覧を取得する
         """
@@ -31,12 +31,12 @@ class MethodRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def find_by_id(self, method_id: str) -> Optional[Method]:
+    def find_by_id(self, method_id: "ID") -> Optional[Method]:
         """
         IDからメソッドを取得する
         """
         pass
 
 
-def NewMethod(id: str, agent_id: str, name: str, description: Optional[str], interface_spec: Optional[dict]) -> Method:
+def NewMethod(id: int, agent_id: int, name: str, description: Optional[str], interface_spec: Optional[dict]) -> Method:
     return Method(id=ID(id), agent_id=ID(agent_id), name=name, description=description, interface_spec=interface_spec)

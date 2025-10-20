@@ -12,7 +12,7 @@ class FinetuningJob:
     status: str  # e.g. 'completed' | 'running' | 'failed'
     created_at: Optional[str]
     finished_at: Optional[str]
-    model_id: Optional[str]
+    model_id: Optional[ID]
 
 
 class FinetuningJobRepository(abc.ABC):
@@ -53,12 +53,12 @@ class FinetuningJobRepository(abc.ABC):
 
 
 def NewFinetuningJob(
-    id: str,
-    agent_id: str,
+    id: int,
+    agent_id: int,
     status: str,
     created_at: Optional[str],
     finished_at: Optional[str],
-    model_id: Optional[str],
+    model_id: Optional[int],
 ) -> FinetuningJob:
     return FinetuningJob(
         id=ID(id),
@@ -66,5 +66,5 @@ def NewFinetuningJob(
         status=status,
         created_at=created_at,
         finished_at=finished_at,
-        model_id=model_id,
+        model_id=ID(model_id) if model_id is not None else None,
     )

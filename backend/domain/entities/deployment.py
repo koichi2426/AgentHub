@@ -52,8 +52,8 @@ class DeploymentRepository(abc.ABC):
 
 
 def NewDeployment(
-    id: str,
-    model_id: str,
+    id: int,
+    model_id: int,
     status: str,
     endpoint: Optional[str],
     created_at: Optional[str],

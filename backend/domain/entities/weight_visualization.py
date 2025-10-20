@@ -41,5 +41,8 @@ class WeightVisualizationRepository(abc.ABC):
         pass
 
 
-def NewWeightVisualization(name: str, before: str, after: str, delta: str) -> WeightVisualization:
-    return WeightVisualization(name=name, before=before, after=after, delta=delta)
+def NewWeightVisualization(
+    job_id: int,
+    layers: list,
+) -> "WeightVisualization":
+    return WeightVisualization(job_id=ID(job_id), layers=layers)

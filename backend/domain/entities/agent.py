@@ -64,5 +64,5 @@ class AgentRepository(abc.ABC):
         pass
 
 
-def NewAgent(id: str, name: str, owner: str, description: Optional[str]) -> Agent:
+def NewAgent(id: int, name: str, owner: str, description: Optional[str]) -> Agent:
     return Agent(id=ID(id), name=name, owner=owner, description=description)
