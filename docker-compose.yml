@@ -30,10 +30,14 @@ services:
       - ./backend:/app
     depends_on:
       - db
+    # ▼▼▼ [修正] FastAPIアプリが必要とする環境変数をすべて渡します ▼▼▼
     environment:
-      # .env ファイルから DATABASE_URL を読み込みます。
-      # .env 側で変数名 (DB_USERなど) は修正済み。
-      DATABASE_URL: ${DATABASE_URL}
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+    # ▲▲▲ 修正ここまで ▲▲▲
     restart: unless-stopped
 
   # ---------------------------------
@@ -43,13 +47,12 @@ services:
     image: mysql:8.0
     container_name: agenthub_db
     environment:
-      # ▼▼▼ [修正] .env ファイルの変数名に合わせる ▼▼▼
+      # .env ファイルの変数 (DB_...) を MySQL コンテナ用の変数 (MYSQL_...) にマッピングします
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
       MYSQL_DATABASE: ${DB_NAME}
     ports:
-      # ▼▼▼ [修正] .env ファイルの変数名に合わせる ▼▼▼
       - "${DB_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
