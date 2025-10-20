@@ -11,7 +11,6 @@ services:
     container_name: agenthub_frontend
     ports:
       - "3000:3000"
-    # ビルド時に作成されたファイルが上書きされないようにします。
     depends_on:
       - backend
     restart: unless-stopped
@@ -29,15 +28,15 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      - db
-    # ▼▼▼ [修正] FastAPIアプリが必要とする環境変数をすべて渡します ▼▼▼
+      # ▼▼▼ [修正] DBのhealthcheckが通ってから起動するように変更 ▼▼▼
+      db:
+        condition: service_healthy
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-    # ▲▲▲ 修正ここまで ▲▲▲
     restart: unless-stopped
 
   # ---------------------------------
@@ -47,7 +46,6 @@ services:
     image: mysql:8.0
     container_name: agenthub_db
     environment:
-      # .env ファイルの変数 (DB_...) を MySQL コンテナ用の変数 (MYSQL_...) にマッピングします
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
@@ -58,9 +56,17 @@ services:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
     command: --default-authentication-plugin=mysql_native_password
+    # ▼▼▼ [追加] DBが正常に起動したかチェックする設定 ▼▼▼
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # ▲▲▲ 追加ここまで ▲▲▲
 
 # ---------------------------------
 # 名前付きボリュームの定義
 # ---------------------------------
 volumes:
   mysql_data:
+
