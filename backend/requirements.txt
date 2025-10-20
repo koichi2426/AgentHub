@@ -4,5 +4,6 @@ sqlalchemy
 alembic
 mysql-connector-python
 python-dotenv
-passlib[bcrypt]
+passlib
+bcrypt==4.0.1
 python-jose[cryptography]
