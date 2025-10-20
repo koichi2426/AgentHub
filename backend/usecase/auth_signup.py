@@ -5,7 +5,7 @@ from typing import Protocol, Tuple
 from passlib.context import CryptContext
 
 # domain 側の型 / ファクトリをインポート
-from ..domain.entities.user import User, UserRepository, NewUser
+from domain.entities.user import User, UserRepository, NewUser
 
 # ======================================
 # パスワードハッシュ用
