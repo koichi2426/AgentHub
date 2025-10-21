@@ -1,6 +1,6 @@
-"use client"; // paramsを安全に扱うためClient Componentに
+"use client";
 
-import { useMemo } from "react"; // useMemoをインポート
+import { useState, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Card,
@@ -10,16 +10,15 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-// ★★★ GitBranch アイコンを削除 ★★★
 import { Bot, BookUser, Plus } from "lucide-react";
 import Link from "next/link";
-import users from "@/lib/mocks/users.json";
 import agents from "@/lib/mocks/agents.json";
-import { User } from "@/lib/data";
-import { notFound } from "next/navigation";
+import { notFound, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { getUser, GetUserResponse } from "@/fetchs/get_user/get_user";
+import Cookies from "js-cookie";
+import { Agent } from "@/lib/data"; // data.tsからAgent型をインポート
 
-// ページのPropsの型を定義
 type UserProfilePageProps = {
   params: {
     username: string;
@@ -27,31 +26,59 @@ type UserProfilePageProps = {
 };
 
 export default function UserProfilePage({ params }: UserProfilePageProps) {
-  // ↓↓ データ検索ロジックをuseMemoでラップしました ↓↓
-  const { user, userAgents } = useMemo(() => {
-    const foundUser = users.find(
-      (u) => u.name.toLowerCase() === params.username.toLowerCase()
+  const [user, setUser] = useState<GetUserResponse | null>(null);
+  const [userAgents, setUserAgents] = useState<Agent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const token = Cookies.get("auth_token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+
+      try {
+        const currentUser = await getUser(token);
+
+        if (currentUser.username.toLowerCase() !== params.username.toLowerCase()) {
+          notFound();
+          return;
+        }
+
+        setUser(currentUser);
+        const foundUserAgents = agents.filter(
+          (agent) => agent.owner === currentUser.username
+        );
+        setUserAgents(foundUserAgents);
+
+      } catch (error) {
+        console.error("Failed to fetch user data:", error);
+        notFound();
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchUserData();
+  }, [params.username, router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading profile...
+      </div>
     );
+  }
 
-    if (!foundUser) {
-      return { user: null, userAgents: [] };
-    }
-
-    const foundUserAgents = agents.filter(
-      (agent) => agent.owner === foundUser.name
-    );
-    return { user: foundUser, userAgents: foundUserAgents };
-  }, [params.username]);
-
-  // ユーザーが見つからない場合は404ページを表示
   if (!user) {
-    notFound();
+    return notFound();
   }
 
   return (
     <div className="container mx-auto max-w-6xl p-4 md:p-10">
       <div className="flex flex-col gap-10 lg:flex-row lg:gap-12">
-        {/* 左側: ユーザー情報 */}
         <aside className="w-full lg:w-1/4">
           <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
             <Avatar className="h-48 w-48 lg:h-64 lg:w-64">
@@ -67,7 +94,6 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
           </div>
         </aside>
 
-        {/* 右側: タブコンテンツ */}
         <div className="flex-1">
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-2 md:w-[200px]">
@@ -81,7 +107,6 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
               </TabsTrigger>
             </TabsList>
 
-            {/* Overviewタブの内容 */}
             <TabsContent value="overview" className="mt-6">
               <Card>
                 <CardHeader>
@@ -100,7 +125,6 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
               </Card>
             </TabsContent>
 
-            {/* Agentsタブの内容 */}
             <TabsContent value="agents" className="mt-6">
               <div className="flex items-center justify-end">
                 <Button asChild>
@@ -117,7 +141,7 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                       <div className="flex items-center gap-4">
                         <Bot className="h-6 w-6" />
                         <Link
-                          href={`/${user.name}/${agent.name}`}
+                          href={`/${user.username}/${agent.name}`}
                           className="text-xl font-bold text-primary hover:underline"
                         >
                           {agent.name}
@@ -128,7 +152,6 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                       <p className="text-muted-foreground">
                         {agent.description}
                       </p>
-                      {/* ★★★ ここにあったバージョン表示のdivを削除しました ★★★ */}
                     </CardContent>
                   </Card>
                 ))}
@@ -140,3 +163,4 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     </div>
   );
 }
+
