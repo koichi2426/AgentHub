@@ -7,10 +7,14 @@ from dotenv import load_dotenv
 
 from domain.entities.user import User, UserRepository
 from domain.services.auth_domain_service import AuthDomainService
+# --- ▼ 修正: Value Objectをインポート ▼ ---
+from domain.value_objects.email import Email
+from domain.value_objects.id import ID
+# --- ▲ 修正 ▲ ---
 
 # --- .env から設定を読み込む ---
 load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")  # デフォルトは安全でないので必ず設定
+SECRET_KEY = os.getenv("SECRET_KEY", "default-secret-key")
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 
@@ -30,15 +34,23 @@ class AuthDomainServiceImpl(AuthDomainService):
         """
         メールアドレスとパスワードを検証し、JWT トークンを発行する。
         """
+        # --- ▼ 修正: email(str)を渡す（内部でVOに変換） ▼ ---
         user: Optional[User] = self._find_user_by_email(email)
+        # --- ▲ 修正 ▲ ---
+        
         if not user:
             raise ValueError("User not found")
 
-        if not pwd_context.verify(password, user.password):
+        # --- ▼ 修正: password_hash を user オブジェクトから取得 ▼ ---
+        if not pwd_context.verify(password, user.password_hash):
             raise ValueError("Invalid credentials")
+        # --- ▲ 修正 ▲ ---
 
+        # --- ▼ 修正: user.id (IDオブジェクト) を .value でプリミティブ値に変換 ▼ ---
         expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-        payload = {"sub": str(user.id), "exp": expire}
+        payload = {"sub": str(user.id.value), "exp": expire} 
+        # --- ▲ 修正 ▲ ---
+        
         token = jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
         return token
 
@@ -48,11 +60,19 @@ class AuthDomainServiceImpl(AuthDomainService):
         """
         try:
             payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-            user_id = payload.get("sub")
-            if user_id is None:
+            user_id_str = payload.get("sub")
+            if user_id_str is None:
                 raise ValueError("Invalid token: no subject")
 
-            user = self.user_repo.find_by_id(int(user_id))
+            # --- ▼ 修正: str -> int -> ID(VO) の順に変換してリポジトリに渡す ▼ ---
+            try:
+                user_id_vo = ID(int(user_id_str))
+            except ValueError:
+                raise ValueError("Invalid user ID in token")
+                
+            user = self.user_repo.find_by_id(user_id_vo)
+            # --- ▲ 修正 ▲ ---
+            
             if not user:
                 raise ValueError("User not found")
             return user
@@ -62,21 +82,24 @@ class AuthDomainServiceImpl(AuthDomainService):
     def logout(self, token: str) -> None:
         """
         ログアウト処理。
-        JWT 方式ではサーバー側で状態を持たないため、
-        実際の処理は不要（フロントがトークンを破棄するだけ）。
         """
         return None
 
     # --- 内部ユーティリティ ---
-    def _find_user_by_email(self, email: str) -> Optional[User]:
+    def _find_user_by_email(self, email_str: str) -> Optional[User]:
+        # --- ▼ 修正: find_all() をやめて、find_by_email() を使う ▼ ---
         """
-        UserRepository に専用メソッドが無いので find_all で探す。
+        UserRepository の find_by_email を使用して効率的に検索する。
         """
-        users = self.user_repo.find_all()
-        for u in users:
-            if u.email == email:
-                return u
-        return None
+        try:
+            # 1. str を Email(VO) に変換
+            email_vo = Email(email_str)
+            # 2. リポジトリの find_by_email を呼び出す
+            return self.user_repo.find_by_email(email_vo)
+        except ValueError:
+            # Email(VO) のバリデーション（形式チェックなど）でエラーになった場合
+            return None
+        # --- ▲ 修正 ▲ ---
 
 
 # --- ファクトリ関数 ---

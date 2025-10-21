@@ -17,7 +17,6 @@ from adapter.presenter.auth_login_presenter import new_login_user_presenter
 from usecase.auth_login import LoginUserInput, new_login_user_interactor
 
 # (Infrastructure / Domain Services)
-# <--- 修正: 存在しないUserMySQLと不要なMySQLHandlerを削除し、MySQLUserRepositoryをインポート ---
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
 from infrastructure.database.mysql.config import NewMySQLConfigFromEnv
 from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomainService
@@ -25,10 +24,8 @@ from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomai
 
 # === Router Setup ===
 router = APIRouter()
-# <--- 修正: Configから直接UserRepositoryのインスタンスを作成（接続プーリングが内部で管理されます） ---
 db_config = NewMySQLConfigFromEnv()
 user_repo = MySQLUserRepository(db_config)
-# db_handler = MySQLHandler(NewMySQLConfigFromEnv()) # <--- 削除
 ctx_timeout = 10.0
 
 
@@ -77,7 +74,6 @@ class LoginUserRequest(BaseModel):
 def create_user(request: CreateUserRequest):
     try:
         # 組み立て
-        # <--- 修正: グローバルな user_repo インスタンスを使用 ---
         repo = user_repo 
         presenter = new_auth_signup_presenter()
         usecase = new_create_user_interactor(presenter, repo, ctx_timeout)
@@ -95,7 +91,6 @@ def create_user(request: CreateUserRequest):
 def login_user(request: LoginUserRequest):
     try:
         # 組み立て
-        # <--- 修正: グローバルな user_repo インスタンスを使用 ---
         repo = user_repo 
         auth_service = NewAuthDomainService(repo)
         presenter = new_login_user_presenter()
