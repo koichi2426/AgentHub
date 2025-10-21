@@ -1,7 +1,8 @@
 import json
 from typing import Dict, Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
@@ -16,6 +17,11 @@ from adapter.controller.auth_login_controller import LoginUserController
 from adapter.presenter.auth_login_presenter import new_login_user_presenter
 from usecase.auth_login import LoginUserInput, new_login_user_interactor
 
+# (Get User)
+from adapter.controller.get_user_controller import GetUserController
+from adapter.presenter.get_user_presenter import new_get_user_presenter
+from usecase.get_user import GetUserInput, new_get_user_interactor
+
 # (Infrastructure / Domain Services)
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
 from infrastructure.database.mysql.config import NewMySQLConfigFromEnv
@@ -27,6 +33,7 @@ router = APIRouter()
 db_config = NewMySQLConfigFromEnv()
 user_repo = MySQLUserRepository(db_config)
 ctx_timeout = 10.0
+oauth2_scheme = HTTPBearer()
 
 
 # --- Helper: 共通レスポンス処理 ---
@@ -35,7 +42,6 @@ def handle_response(response_dict: Dict, success_code: int = 200):
     data = response_dict.get("data")
 
     if status_code >= 400:
-        # Pydanticモデルを辞書に変換
         if hasattr(data, 'dict'):
              data = data.dict()
         return JSONResponse(content=data, status_code=status_code)
@@ -44,7 +50,6 @@ def handle_response(response_dict: Dict, success_code: int = 200):
         return Response(status_code=204)
 
     try:
-        # Pydanticモデルを辞書に変換してからJSON文字列に
         if hasattr(data, 'dict'):
             data = data.dict()
         content_str = json.dumps(data, default=str)
@@ -103,3 +108,26 @@ def login_user(request: LoginUserRequest):
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ▼▼▼ [追加] ユーザー情報取得エンドポイント ▼▼▼
+@router.get("/v1/users/me")
+def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
+    try:
+        token = credentials.credentials
+
+        # 組み立て
+        repo = user_repo
+        auth_service = NewAuthDomainService(repo)
+        presenter = new_get_user_presenter()
+        usecase = new_get_user_interactor(presenter, auth_service, ctx_timeout)
+        controller = GetUserController(usecase)
+
+        # DTOを作成して実行
+        input_data = GetUserInput(token=token)
+        response_dict = controller.execute(input_data)
+        return handle_response(response_dict, success_code=200)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+# ▲▲▲ 追加ここまで ▲▲▲
+

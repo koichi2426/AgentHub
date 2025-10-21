@@ -4,7 +4,6 @@ import "./globals.css";
 
 import { cn } from "@/lib/utils"
 import { ThemeProvider } from "@/components/theme-provider";
-import { Header } from "@/components/header"; // Headerをインポート
 
 const fontSans = FontSans({
   subsets: ["latin"],
@@ -35,8 +34,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <Header /> {/* ここにHeaderを追加 */}
-          <main>{children}</main> {/* childrenをmainタグで囲む */}
+          <main>{children}</main>
         </ThemeProvider>
       </body>
     </html>
