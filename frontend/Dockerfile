@@ -3,6 +3,11 @@
 # Builder Stage
 FROM node:20-alpine AS builder
 WORKDIR /app
+
+# docker-compose.yml の build.args から変数を受け取る
+ARG NEXT_PUBLIC_API_URL
+ARG API_URL_INTERNAL
+
 COPY package*.json ./
 RUN npm install
 COPY . .
