@@ -39,6 +39,13 @@ class UserRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
+    def find_by_email(self, email: "Email") -> Optional[User]:
+        """
+        Emailからユーザーを検索する
+        """
+        pass
+
+    @abc.abstractmethod
     def find_all(self) -> list[User]:
         """
         すべてのユーザーを取得する

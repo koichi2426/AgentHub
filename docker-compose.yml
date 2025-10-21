@@ -28,7 +28,6 @@ services:
     volumes:
       - ./backend:/app
     depends_on:
-      # ▼▼▼ [修正] DBのhealthcheckが通ってから起動するように変更 ▼▼▼
       db:
         condition: service_healthy
     environment:
@@ -37,6 +36,9 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
     restart: unless-stopped
 
   # ---------------------------------
@@ -56,17 +58,14 @@ services:
       - mysql_data:/var/lib/mysql
     restart: unless-stopped
     command: --default-authentication-plugin=mysql_native_password
-    # ▼▼▼ [追加] DBが正常に起動したかチェックする設定 ▼▼▼
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       interval: 10s
       timeout: 5s
       retries: 5
-    # ▲▲▲ 追加ここまで ▲▲▲
 
 # ---------------------------------
 # 名前付きボリュームの定義
 # ---------------------------------
 volumes:
   mysql_data:
-
