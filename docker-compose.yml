@@ -8,12 +8,18 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+        - API_URL_INTERNAL=${API_URL_INTERNAL}
     container_name: agenthub_frontend
     ports:
       - "3000:3000"
     depends_on:
       - backend
     restart: unless-stopped
+    environment:
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+      - API_URL_INTERNAL=${API_URL_INTERNAL}
 
   # ---------------------------------
   # バックエンドサービス (FastAPI)
