@@ -27,6 +27,18 @@ export default function SignupPage() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4">
+            {/* --- ▼ 修正（追加） ▼ --- */}
+            <div className="grid gap-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="suzuki"
+                required
+              />
+            </div>
+            {/* --- ▲ 修正（追加） ▲ --- */}
+
             <div className="grid gap-2">
               <Label htmlFor="name">Name</Label>
               <Input id="name" placeholder="Agent Smith" required />
@@ -44,6 +56,14 @@ export default function SignupPage() {
               <Label htmlFor="password">Password</Label>
               <Input id="password" type="password" required />
             </div>
+
+            {/* --- ▼ 修正（追加） ▼ --- */}
+            <div className="grid gap-2">
+              <Label htmlFor="confirm-password">Confirm Password</Label>
+              <Input id="confirm-password" type="password" required />
+            </div>
+            {/* --- ▲ 修正（追加） ▲ --- */}
+
             <Button type="submit" className="w-full">
               Create account
             </Button>
