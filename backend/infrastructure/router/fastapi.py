@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-# --- Controller / Presenter / Repository / Usecase / DB imports ---
+# --- Controller / Presenter / Usecase imports ---
 # (Signup)
 from adapter.controller.auth_signup_controller import CreateUserController
 from adapter.presenter.auth_signup_presenter import new_auth_signup_presenter
@@ -17,15 +17,18 @@ from adapter.presenter.auth_login_presenter import new_login_user_presenter
 from usecase.auth_login import LoginUserInput, new_login_user_interactor
 
 # (Infrastructure / Domain Services)
-from adapter.repository.user_mysql.user_mysql import UserMySQL
-from infrastructure.database.mysql_handler import MySQLHandler
-from infrastructure.database.config import NewMySQLConfigFromEnv
+# <--- 修正: 存在しないUserMySQLと不要なMySQLHandlerを削除し、MySQLUserRepositoryをインポート ---
+from infrastructure.database.mysql.user_repository import MySQLUserRepository
+from infrastructure.database.mysql.config import NewMySQLConfigFromEnv
 from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomainService
 
 
 # === Router Setup ===
 router = APIRouter()
-db_handler = MySQLHandler(NewMySQLConfigFromEnv())
+# <--- 修正: Configから直接UserRepositoryのインスタンスを作成（接続プーリングが内部で管理されます） ---
+db_config = NewMySQLConfigFromEnv()
+user_repo = MySQLUserRepository(db_config)
+# db_handler = MySQLHandler(NewMySQLConfigFromEnv()) # <--- 削除
 ctx_timeout = 10.0
 
 
@@ -74,7 +77,8 @@ class LoginUserRequest(BaseModel):
 def create_user(request: CreateUserRequest):
     try:
         # 組み立て
-        repo = UserMySQL(db_handler)
+        # <--- 修正: グローバルな user_repo インスタンスを使用 ---
+        repo = user_repo 
         presenter = new_auth_signup_presenter()
         usecase = new_create_user_interactor(presenter, repo, ctx_timeout)
         controller = CreateUserController(usecase)
@@ -91,7 +95,8 @@ def create_user(request: CreateUserRequest):
 def login_user(request: LoginUserRequest):
     try:
         # 組み立て
-        repo = UserMySQL(db_handler)
+        # <--- 修正: グローバルな user_repo インスタンスを使用 ---
+        repo = user_repo 
         auth_service = NewAuthDomainService(repo)
         presenter = new_login_user_presenter()
         usecase = new_login_user_interactor(presenter, auth_service, ctx_timeout)

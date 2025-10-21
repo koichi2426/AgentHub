@@ -8,7 +8,7 @@ from alembic import context
 
 # --- ここから編集 ---
 # 追加: MySQLConfigの読み込み
-from infrastructure.database.config import NewMySQLConfigFromEnv
+from infrastructure.database.mysql.config import NewMySQLConfigFromEnv
 from infrastructure.database import models  # Base を import
 # --- ここまで編集 ---
 
