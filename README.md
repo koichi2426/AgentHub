@@ -23,6 +23,8 @@ cd AgentHub
 
 ```dotenv
 # データベース接続情報 (MySQL)
+# これらの値は開発用です。本番環境ではより強力なパスワードに変更してください。
+
 DB_USER=user
 DB_PASSWORD=password
 DB_ROOT_PASSWORD=rootpassword
@@ -30,7 +32,20 @@ DB_NAME=agenthub_db
 DB_HOST=db
 DB_PORT=3306
 
+# FastAPIバックエンドが使用するデータベース接続URL
+# 変数名をAlembicと統一
 DATABASE_URL=mysql+pymysql://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
+
+# JWT 設定
+SECRET_KEY=supersecretkey_please_change_me
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# --- Frontend (Next.js) 用 ---
+# ブラウザからアクセスするAPIのURL
+NEXT_PUBLIC_API_URL=http://localhost:8000
+# Next.jsサーバーからアクセスするAPIのURL (コンテナ間通信)
+API_URL_INTERNAL=http://backend:8000
 ```
 
 **【重要】** `DB_HOST=db` は、Dockerネットワーク内のホスト名のため変更しないでください。
