@@ -1,5 +1,5 @@
 import json
-from typing import Dict, Optional
+from typing import Dict, Optional, List # Listをインポート
 from dataclasses import is_dataclass, asdict # dataclassを扱うためにインポート
 
 from fastapi import APIRouter, Depends
@@ -27,6 +27,12 @@ from usecase.get_user import GetUserInput, GetUserOutput, new_get_user_interacto
 from adapter.controller.create_agent_controller import CreateAgentController
 from adapter.presenter.create_agent_presenter import new_create_agent_presenter
 from usecase.create_agent import CreateAgentInput, CreateAgentOutput, new_create_agent_interactor
+
+# ▼▼▼ [追記] Get User Agents 関連のインポート ▼▼▼
+from adapter.controller.get_user_agents_controller import GetUserAgentsController
+from adapter.presenter.get_user_agents_presenter import new_get_user_agents_presenter
+from usecase.get_user_agents import GetUserAgentsInput, GetUserAgentsOutput, new_get_user_agents_interactor
+# ▲▲▲ 追記ここまで ▲▲▲
 
 # (Infrastructure / Domain Services)
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
@@ -135,7 +141,7 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-# ▼▼▼ [追加] エージェント作成エンドポイント ▼▼▼
+# エージェント作成エンドポイント
 @router.post("/v1/agents", response_model=CreateAgentOutput)
 def create_agent(
     request: CreateAgentRequest,
@@ -160,4 +166,30 @@ def create_agent(
         return handle_response(response_dict, success_code=201)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
-# ▲▲▲ 追加ここまで ▲▲▲
+
+
+# ▼▼▼ [新規追加] ユーザーのエージェント一覧取得エンドポイント ▼▼▼
+@router.get("/v1/agents", response_model=GetUserAgentsOutput)
+def get_user_agents(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
+    """
+    認証されたユーザーが作成した全てのエージェント一覧を取得するAPIエンドポイント。
+    """
+    try:
+        token = credentials.credentials
+        
+        # 組み立て
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_get_user_agents_presenter()
+        # GetUserAgentsInteractor は timeout_sec を受け取らないため、引数から除外
+        usecase = new_get_user_agents_interactor(presenter, agent_repo, auth_service)
+        controller = GetUserAgentsController(usecase)
+
+        # DTOを作成して実行
+        # Controllerは token を直接受け取るため、Input DTOの生成は省略し直接実行
+        response_dict = controller.execute(token=token) 
+        
+        # GETリクエストの成功コードは 200 OK
+        return handle_response(response_dict, success_code=200)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+# ▲▲▲ 新規追加ここまで ▲▲▲
