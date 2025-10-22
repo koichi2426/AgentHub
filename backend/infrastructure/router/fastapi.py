@@ -1,5 +1,6 @@
 import json
 from typing import Dict, Optional
+from dataclasses import is_dataclass, asdict # dataclassを扱うためにインポート
 
 from fastapi import APIRouter, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -10,20 +11,26 @@ from pydantic import BaseModel
 # (Signup)
 from adapter.controller.auth_signup_controller import CreateUserController
 from adapter.presenter.auth_signup_presenter import new_auth_signup_presenter
-from usecase.auth_signup import CreateUserInput, new_create_user_interactor
+from usecase.auth_signup import CreateUserInput, CreateUserOutput, new_create_user_interactor
 
 # (Login)
 from adapter.controller.auth_login_controller import LoginUserController
 from adapter.presenter.auth_login_presenter import new_login_user_presenter
-from usecase.auth_login import LoginUserInput, new_login_user_interactor
+from usecase.auth_login import LoginUserInput, LoginUserOutput, new_login_user_interactor
 
 # (Get User)
 from adapter.controller.get_user_controller import GetUserController
 from adapter.presenter.get_user_presenter import new_get_user_presenter
-from usecase.get_user import GetUserInput, new_get_user_interactor
+from usecase.get_user import GetUserInput, GetUserOutput, new_get_user_interactor
+
+# (Create Agent)
+from adapter.controller.create_agent_controller import CreateAgentController
+from adapter.presenter.create_agent_presenter import new_create_agent_presenter
+from usecase.create_agent import CreateAgentInput, CreateAgentOutput, new_create_agent_interactor
 
 # (Infrastructure / Domain Services)
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
+from infrastructure.database.mysql.agent_repository import MySQLAgentRepository # Agentリポジトリをインポート
 from infrastructure.database.mysql.config import NewMySQLConfigFromEnv
 from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomainService
 
@@ -32,6 +39,7 @@ from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomai
 router = APIRouter()
 db_config = NewMySQLConfigFromEnv()
 user_repo = MySQLUserRepository(db_config)
+agent_repo = MySQLAgentRepository(db_config) # Agentリポジトリをインスタンス化
 ctx_timeout = 10.0
 oauth2_scheme = HTTPBearer()
 
@@ -41,24 +49,18 @@ def handle_response(response_dict: Dict, success_code: int = 200):
     status_code = response_dict.get("status", 500)
     data = response_dict.get("data")
 
+    # ▼▼▼ [修正] DTO(dataclass)を辞書に変換する処理を追加 ▼▼▼
+    if is_dataclass(data):
+        data = asdict(data)
+    # ▲▲▲ 修正ここまで ▲▲▲
+
     if status_code >= 400:
-        if hasattr(data, 'dict'):
-             data = data.dict()
         return JSONResponse(content=data, status_code=status_code)
 
     if success_code == 204:
         return Response(status_code=204)
 
-    try:
-        if hasattr(data, 'dict'):
-            data = data.dict()
-        content_str = json.dumps(data, default=str)
-        content_data = json.loads(content_str)
-    except TypeError:
-        content_data = {"error": "Failed to serialize response data"}
-        status_code = 500
-
-    return JSONResponse(content=content_data, status_code=success_code if status_code < 400 else status_code)
+    return JSONResponse(content=data, status_code=success_code)
 
 
 # === Request DTOs ===
@@ -73,9 +75,13 @@ class LoginUserRequest(BaseModel):
     email: str
     password: str
 
+class CreateAgentRequest(BaseModel):
+    name: str
+    description: Optional[str]
 
-# === Auth Routes ===
-@router.post("/v1/auth/signup")
+
+# === Auth and User Routes ===
+@router.post("/v1/auth/signup", response_model=CreateUserOutput)
 def create_user(request: CreateUserRequest):
     try:
         # 組み立て
@@ -92,7 +98,7 @@ def create_user(request: CreateUserRequest):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-@router.post("/v1/auth/login")
+@router.post("/v1/auth/login", response_model=LoginUserOutput)
 def login_user(request: LoginUserRequest):
     try:
         # 組み立て
@@ -110,8 +116,7 @@ def login_user(request: LoginUserRequest):
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ▼▼▼ [追加] ユーザー情報取得エンドポイント ▼▼▼
-@router.get("/v1/users/me")
+@router.get("/v1/users/me", response_model=GetUserOutput)
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
     try:
         token = credentials.credentials
@@ -129,5 +134,30 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
-# ▲▲▲ 追加ここまで ▲▲▲
 
+# ▼▼▼ [追加] エージェント作成エンドポイント ▼▼▼
+@router.post("/v1/agents", response_model=CreateAgentOutput)
+def create_agent(
+    request: CreateAgentRequest,
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    try:
+        token = credentials.credentials
+        
+        # 組み立て
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_create_agent_presenter()
+        usecase = new_create_agent_interactor(presenter, agent_repo, auth_service, ctx_timeout)
+        controller = CreateAgentController(usecase)
+
+        # DTOを作成して実行
+        input_data = CreateAgentInput(
+            token=token,
+            name=request.name,
+            description=request.description
+        )
+        response_dict = controller.execute(input_data)
+        return handle_response(response_dict, success_code=201)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+# ▲▲▲ 追加ここまで ▲▲▲
