@@ -2,7 +2,7 @@ import json
 from typing import Dict, Optional, List # Listをインポート
 from dataclasses import is_dataclass, asdict # dataclassを扱うためにインポート
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, UploadFile, File # ★ UploadFileとFileをインポート ★
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -28,26 +28,48 @@ from adapter.controller.create_agent_controller import CreateAgentController
 from adapter.presenter.create_agent_presenter import new_create_agent_presenter
 from usecase.create_agent import CreateAgentInput, CreateAgentOutput, new_create_agent_interactor
 
-# ▼▼▼ [追記] Get User Agents 関連のインポート ▼▼▼
+# (Get User Agents)
 from adapter.controller.get_user_agents_controller import GetUserAgentsController
 from adapter.presenter.get_user_agents_presenter import new_get_user_agents_presenter
 from usecase.get_user_agents import GetUserAgentsInput, GetUserAgentsOutput, new_get_user_agents_interactor
-# ▲▲▲ 追記ここまで ▲▲▲
+
+# ▼▼▼ [新規追加] Create Finetuning Job 関連のインポート ▼▼▼
+from adapter.controller.create_finetuning_job_controller import CreateFinetuningJobController
+from adapter.presenter.create_finetuning_job_presenter import new_create_finetuning_job_presenter
+from usecase.create_finetuning_job import CreateFinetuningJobInput, CreateFinetuningJobOutput, new_create_finetuning_job_interactor
+from infrastructure.domain.value_objects.file_data_impl import FastAPIUploadedFileAdapter # ファイルアダプタ
+# ▲▲▲ 新規追加ここまで ▲▲▲
+
 
 # (Infrastructure / Domain Services)
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
-from infrastructure.database.mysql.agent_repository import MySQLAgentRepository # Agentリポジトリをインポート
+from infrastructure.database.mysql.agent_repository import MySQLAgentRepository 
+# ▼▼▼ [新規追加] Finetuning Job Repository をインポート ▼▼▼
+from infrastructure.database.mysql.finetuning_job_repository import MySQLFinetuningJobRepository
+# ▲▲▲ 新規追加ここまで ▲▲▲
 from infrastructure.database.mysql.config import NewMySQLConfigFromEnv
 from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomainService
+# ▼▼▼ [新規追加] New Domain Service Impls をインポート ▼▼▼
+from infrastructure.domain.services.file_storage_domain_service_impl import NewFileStorageDomainService
+from infrastructure.domain.services.job_queue_domain_service_impl import NewJobQueueDomainService
+# ▲▲▲ 新規追加ここまで ▲▲▲
 
 
 # === Router Setup ===
 router = APIRouter()
 db_config = NewMySQLConfigFromEnv()
 user_repo = MySQLUserRepository(db_config)
-agent_repo = MySQLAgentRepository(db_config) # Agentリポジトリをインスタンス化
+agent_repo = MySQLAgentRepository(db_config) 
+# ▼▼▼ [新規追加] Finetuning Job Repository をインスタンス化 ▼▼▼
+finetuning_job_repo = MySQLFinetuningJobRepository(db_config) 
+# ▲▲▲ 新規追加ここまで ▲▲▲
 ctx_timeout = 10.0
 oauth2_scheme = HTTPBearer()
+
+# ▼▼▼ [新規追加] 新しいドメインサービスをインスタンス化 ▼▼▼
+file_storage_service = NewFileStorageDomainService()
+job_queue_service = NewJobQueueDomainService()
+# ▲▲▲ 新規追加ここまで ▲▲▲
 
 
 # --- Helper: 共通レスポンス処理 ---
@@ -86,7 +108,7 @@ class CreateAgentRequest(BaseModel):
     description: Optional[str]
 
 
-# === Auth and User Routes ===
+# === Auth and User Routes (中略) ===
 @router.post("/v1/auth/signup", response_model=CreateUserOutput)
 def create_user(request: CreateUserRequest):
     try:
@@ -168,7 +190,7 @@ def create_agent(
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ▼▼▼ [新規追加] ユーザーのエージェント一覧取得エンドポイント ▼▼▼
+# ユーザーのエージェント一覧取得エンドポイント
 @router.get("/v1/agents", response_model=GetUserAgentsOutput)
 def get_user_agents(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
     """
@@ -180,16 +202,58 @@ def get_user_agents(credentials: HTTPAuthorizationCredentials = Depends(oauth2_s
         # 組み立て
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_get_user_agents_presenter()
-        # GetUserAgentsInteractor は timeout_sec を受け取らないため、引数から除外
         usecase = new_get_user_agents_interactor(presenter, agent_repo, auth_service)
         controller = GetUserAgentsController(usecase)
 
         # DTOを作成して実行
-        # Controllerは token を直接受け取るため、Input DTOの生成は省略し直接実行
         response_dict = controller.execute(token=token) 
         
-        # GETリクエストの成功コードは 200 OK
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+# ▼▼▼ [新規追加] ファインチューニングジョブ作成エンドポイント ▼▼▼
+@router.post("/v1/agents/{agent_id}/finetuning", response_model=CreateFinetuningJobOutput)
+def create_finetuning_job(
+    agent_id: int,
+    training_file: UploadFile = File(..., description="Training data file (.txt)"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    トレーニングデータファイルを受け付け、ファインチューニングジョブをキューに投入する。
+    """
+    try:
+        token = credentials.credentials
+        
+        # 1. Adapterを使用してFastAPIのUploadFileをドメインの抽象型に変換
+        domain_file_stream = FastAPIUploadedFileAdapter(training_file)
+
+        # 2. 組み立て
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_create_finetuning_job_presenter()
+        
+        # NewFinetuningJobInteractorは5つの依存関係を受け取る
+        usecase = new_create_finetuning_job_interactor(
+            presenter=presenter,
+            job_repo=finetuning_job_repo,          # FinetuningJobリポジトリ
+            agent_repo=agent_repo,
+            auth_service=auth_service,
+            file_storage_service=file_storage_service, # 抽象化されたファイルストレージ
+            job_queue_service=job_queue_service,       # 抽象化されたジョブキュー
+        )
+        controller = CreateFinetuningJobController(usecase)
+
+        # 3. Controllerを実行
+        response_dict = controller.execute(
+            token=token,
+            agent_id=agent_id,
+            uploaded_file=training_file # FastAPIのUploadFileを渡す
+        )
+        
+        # 4. 応答 (キューイングに成功したら 201 Created / 202 Accepted)
+        return handle_response(response_dict, success_code=201)
+    
+    except Exception as e:
+        return JSONResponse({"error": f"An unexpected error occurred: {e}"}, status_code=500)
 # ▲▲▲ 新規追加ここまで ▲▲▲
