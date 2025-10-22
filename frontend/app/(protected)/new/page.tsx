@@ -1,3 +1,8 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import Cookies from "js-cookie";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,14 +16,40 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Bot } from "lucide-react";
-import users from "@/lib/mocks/users.json";
-import { User } from "@/lib/data";
-// ↓↓ ここにAvatar関連のコンポーネントを追加しました ↓↓
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { getUser, GetUserResponse } from "@/fetchs/get_user/get_user";
 
 export default function NewAgentPage() {
-  // モックデータから現在のユーザーを取得（ここでは最初のユーザーを仮定）
-  const currentUser: User = users[0];
+  const [user, setUser] = useState<GetUserResponse | null>(null);
+  const router = useRouter();
+
+  useEffect(() => {
+    const fetchCurrentUser = async () => {
+      const token = Cookies.get("auth_token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
+      try {
+        const userData = await getUser(token);
+        setUser(userData);
+      } catch (error) {
+        console.error("Failed to fetch user", error);
+        // トークンが無効な場合などもログインページにリダイレクト
+        router.push("/login");
+      }
+    };
+    fetchCurrentUser();
+  }, [router]);
+
+  // ユーザー情報が読み込まれるまでローディング表示
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto max-w-3xl p-4 md:p-10">
@@ -33,12 +64,12 @@ export default function NewAgentPage() {
         <CardHeader>
           <CardTitle className="flex items-center">
             <Avatar className="mr-2 h-5 w-5">
-              <AvatarImage src={currentUser.avatar_url} />
+              <AvatarImage src={user.avatar_url} />
               <AvatarFallback>
-                {currentUser.name.substring(0, 1)}
+                {user.name.substring(0, 1).toUpperCase()}
               </AvatarFallback>
             </Avatar>
-            {currentUser.name}
+            {user.name}
             <span className="mx-2">/</span>
             <span className="font-normal text-muted-foreground">Agent name</span>
           </CardTitle>
@@ -74,4 +105,3 @@ export default function NewAgentPage() {
     </div>
   );
 }
-
