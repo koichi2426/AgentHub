@@ -223,10 +223,11 @@ def create_finetuning_job(
     """
     try:
         token = credentials.credentials
-        
+        print("# 1. Adapterを使用してFastAPIのUploadFileをドメインの抽象型に変換")
         # 1. Adapterを使用してFastAPIのUploadFileをドメインの抽象型に変換
         domain_file_stream = FastAPIUploadedFileAdapter(training_file)
 
+        print("# 2. Input DTO を構築")
         # 2. Input DTO を構築
         input_data = CreateFinetuningJobInput(
             token=token,
@@ -234,6 +235,7 @@ def create_finetuning_job(
             training_file=domain_file_stream # 抽象化されたファイルストリームを渡す
         )
 
+        print("# 3. 組み立て")
         # 3. 組み立て
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_create_finetuning_job_presenter()
@@ -248,6 +250,7 @@ def create_finetuning_job(
         )
         controller = CreateFinetuningJobController(usecase)
 
+        print("# 4. Controllerを実行")
         # 4. Controllerを実行 (Input DTOを引数として渡す形式)
         response_dict = controller.execute(
             input_data=input_data 

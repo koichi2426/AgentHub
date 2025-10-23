@@ -1,7 +1,4 @@
-from typing import BinaryIO
-from fastapi import UploadFile
-
-# ★ ドメイン層から抽象クラスをインポート ★
+from typing import BinaryIO, Any
 from domain.value_objects.file_data import UploadedFileStream
 
 
@@ -10,9 +7,13 @@ class FastAPIUploadedFileAdapter(UploadedFileStream):
     FastAPIのUploadFileオブジェクトを、ドメイン層のUploadedFileStreamインターフェースに
     適合させるためのアダプタ（インフラ層の実装）。
     """
-    def __init__(self, upload_file: UploadFile):
-        if not isinstance(upload_file, UploadFile):
-            raise TypeError("Expected a fastapi.UploadFile instance.")
+    def __init__(self, upload_file: Any): 
+        # 厳密な型チェックを削除し、ダックタイピング（属性チェック）に移行
+        
+        # ファイル操作に必要な 'file' と 'filename' 属性があるかを確認
+        if not hasattr(upload_file, 'file') or not hasattr(upload_file, 'filename'):
+             raise TypeError("Object passed to adapter lacks necessary file stream attributes.")
+             
         self._upload_file = upload_file
 
     @property
