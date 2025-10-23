@@ -84,10 +84,10 @@ class CreateFinetuningJobInteractor:
         empty_output = CreateFinetuningJobOutput(id=0, agent_id=0, status="", created_at="", message="")
         
         try:
-            print("# 1. トークンを検証してユーザー情報を取得")
+            # 1. トークンを検証してユーザー情報を取得
             user = self.auth_service.verify_token(input.token)
 
-            print("# 2. Agentの存在確認と所有権チェック")
+            # 2. Agentの存在確認と所有権チェック
             agent = self.agent_repo.find_by_id(ID(input.agent_id))
             if not agent:
                 raise ValueError(f"Agent with ID {input.agent_id} not found.")
@@ -95,19 +95,15 @@ class CreateFinetuningJobInteractor:
                 raise PermissionError("User does not own this agent.")
                 
             # 3. ファイルを抽象サービスに委譲して共有ストレージに保存
-            print("# 3. ファイルを抽象サービスに委譲して共有ストレージに保存")
             file_path = self.file_storage_service.save_training_file(
                 input.training_file, 
                 str(input.agent_id)
             )
 
-            # ★ 4a. 時刻サービスの利用 ★
-            # 時刻をインフラ層から文字列で取得
-            print("# 4a. 時刻サービスの利用")
+            # 4a. 時刻サービスの利用
             current_time_str = self.system_time_service.get_current_time()
             
             # 4b. FinetuningJobエンティティを生成（初期ステータス: 'queued'）
-            print("# 4b. FinetuningJobエンティティを生成")
             new_job = FinetuningJob(
                 id=ID(0), 
                 agent_id=ID(input.agent_id),
@@ -120,16 +116,16 @@ class CreateFinetuningJobInteractor:
                 error_message=None
             )
 
-            print("# 5. リポジトリにジョブを永続化")
+            # 5. リポジトリにジョブを永続化
             created_job = self.job_repo.create_job(new_job)
 
-            print("# 6. 抽象的なキューサービスを通じてタスクをキューに投入")
+            # 6. 抽象的なキューサービスを通じてタスクをキューに投入
             self.job_queue_service.enqueue_finetuning_job(
                 created_job.id.value, 
                 created_job.training_file_path
             )
 
-            print("# 7. Presenterに渡してOutput DTOに変換")
+            # 7. Presenterに渡してOutput DTOに変換
             output = self.presenter.output(created_job)
             return output, None
             
