@@ -1,7 +1,6 @@
 import abc
 from dataclasses import dataclass
 from typing import Protocol, Tuple, Optional, Any
-from datetime import datetime
 
 # ドメイン層の依存関係
 from domain.entities.finetuning_job import FinetuningJob, FinetuningJobRepository
@@ -10,6 +9,7 @@ from domain.services.auth_domain_service import AuthDomainService
 # 新しい抽象ドメインサービス
 from domain.services.file_storage_domain_service import FileStorageDomainService
 from domain.services.job_queue_domain_service import JobQueueDomainService
+from domain.services.system_time_domain_service import SystemTimeDomainService
 from domain.value_objects.id import ID
 from domain.value_objects.file_data import UploadedFileStream 
 
@@ -42,7 +42,7 @@ class CreateFinetuningJobOutput:
     id: int
     agent_id: int
     status: str
-    created_at: datetime
+    created_at: str
     message: str = "Job successfully queued."
 
 
@@ -65,9 +65,9 @@ class CreateFinetuningJobInteractor:
         job_repo: FinetuningJobRepository,
         agent_repo: AgentRepository,
         auth_service: AuthDomainService,
-        # 抽象化されたドメインサービスをDIで受け取る
         file_storage_service: FileStorageDomainService, 
         job_queue_service: JobQueueDomainService,
+        system_time_service: SystemTimeDomainService, 
     ):
         self.presenter = presenter
         self.job_repo = job_repo
@@ -75,19 +75,18 @@ class CreateFinetuningJobInteractor:
         self.auth_service = auth_service
         self.file_storage_service = file_storage_service 
         self.job_queue_service = job_queue_service       
+        self.system_time_service = system_time_service 
 
     def execute(
         self, input: CreateFinetuningJobInput
     ) -> Tuple["CreateFinetuningJobOutput", Exception | None]:
         
-        empty_output = CreateFinetuningJobOutput(id=0, agent_id=0, status="", created_at=datetime.now(), message="")
+        empty_output = CreateFinetuningJobOutput(id=0, agent_id=0, status="", created_at="", message="")
         
         try:
-            # 1. トークンを検証してユーザー情報を取得
             print("# 1. トークンを検証してユーザー情報を取得")
             user = self.auth_service.verify_token(input.token)
 
-            # 2. Agentの存在確認と所有権チェック
             print("# 2. Agentの存在確認と所有権チェック")
             agent = self.agent_repo.find_by_id(ID(input.agent_id))
             if not agent:
@@ -97,47 +96,50 @@ class CreateFinetuningJobInteractor:
                 
             # 3. ファイルを抽象サービスに委譲して共有ストレージに保存
             print("# 3. ファイルを抽象サービスに委譲して共有ストレージに保存")
-            # ユースケースは具体的なストレージ実装を知らない
             file_path = self.file_storage_service.save_training_file(
                 input.training_file, 
                 str(input.agent_id)
             )
 
-            # 4. FinetuningJobエンティティを生成（初期ステータス: 'queued'）
-            print("# 4. FinetuningJobエンティティを生成")
+            # ★ 4a. 時刻サービスの利用 ★
+            # 時刻をインフラ層から文字列で取得
+            print("# 4a. 時刻サービスの利用")
+            current_time_str = self.system_time_service.get_current_time()
+            
+            # 4b. FinetuningJobエンティティを生成（初期ステータス: 'queued'）
+            print("# 4b. FinetuningJobエンティティを生成")
             new_job = FinetuningJob(
                 id=ID(0), 
                 agent_id=ID(input.agent_id),
                 training_file_path=file_path,
                 status="queued",
                 model_id=None,
-                created_at=datetime.now(),
+                # created_at には、時刻サービスから取得した純粋な文字列を渡す
+                created_at=current_time_str, 
                 finished_at=None,
                 error_message=None
             )
 
-            # 5. リポジトリにジョブを永続化
             print("# 5. リポジトリにジョブを永続化")
             created_job = self.job_repo.create_job(new_job)
 
-            # 6. 抽象的なキューサービスを通じてタスクをキューに投入
             print("# 6. 抽象的なキューサービスを通じてタスクをキューに投入")
-            # ユースケースは Celery/Redis の実装を知らない
             self.job_queue_service.enqueue_finetuning_job(
                 created_job.id.value, 
                 created_job.training_file_path
             )
 
-            # 7. Presenterに渡してOutput DTOに変換
             print("# 7. Presenterに渡してOutput DTOに変換")
             output = self.presenter.output(created_job)
             return output, None
             
         except (ValueError, PermissionError) as e:
             # ファイル保存失敗や認証/権限エラー
+            import traceback; traceback.print_exc()
             return empty_output, e
         except Exception as e:
             # その他のシステムエラー
+            import traceback; traceback.print_exc()
             return empty_output, e
 
 
@@ -151,6 +153,7 @@ def new_create_finetuning_job_interactor(
     auth_service: AuthDomainService,
     file_storage_service: FileStorageDomainService,
     job_queue_service: JobQueueDomainService,
+    system_time_service: SystemTimeDomainService,
 ) -> "CreateFinetuningJobUseCase":
     return CreateFinetuningJobInteractor(
         presenter=presenter,
@@ -159,4 +162,5 @@ def new_create_finetuning_job_interactor(
         auth_service=auth_service,
         file_storage_service=file_storage_service,
         job_queue_service=job_queue_service,
+        system_time_service=system_time_service,
     )

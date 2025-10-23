@@ -1,6 +1,7 @@
 import json
 from typing import Dict, Optional, List
 from dataclasses import is_dataclass, asdict
+from datetime import datetime # JSON変換ロジックで使用
 
 from fastapi import APIRouter, Depends, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -52,6 +53,7 @@ from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomai
 # ▼▼▼ [新規追加] New Domain Service Impls をインポート ▼▼▼
 from infrastructure.domain.services.file_storage_domain_service_impl import NewFileStorageDomainService
 from infrastructure.domain.services.job_queue_domain_service_impl import NewJobQueueDomainService
+from infrastructure.domain.services.system_time_domain_service_impl import NewSystemTimeDomainService # ★ 時刻サービスをインポート ★
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
 
@@ -69,6 +71,7 @@ oauth2_scheme = HTTPBearer()
 # ▼▼▼ [新規追加] 新しいドメインサービスをインスタンス化 ▼▼▼
 file_storage_service = NewFileStorageDomainService()
 job_queue_service = NewJobQueueDomainService()
+system_time_service = NewSystemTimeDomainService() # ★ 時刻サービスをインスタンス化 ★
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
 
@@ -77,8 +80,22 @@ def handle_response(response_dict: Dict, success_code: int = 200):
     status_code = response_dict.get("status", 500)
     data = response_dict.get("data")
 
+    # DTOを辞書に変換
     if is_dataclass(data):
         data = asdict(data)
+        
+        # ★★★ 修正: datetimeオブジェクトをISO文字列に変換 (エラー回避用) ★★★
+        def convert_datetime_to_str(obj):
+            if isinstance(obj, datetime):
+                return obj.isoformat()
+            if isinstance(obj, dict):
+                return {k: convert_datetime_to_str(v) for k, v in obj.items()}
+            if isinstance(obj, list):
+                return [convert_datetime_to_str(v) for v in obj]
+            return obj
+        
+        data = convert_datetime_to_str(data)
+        # ★★★ 修正ここまで ★★★
 
     if status_code >= 400:
         return JSONResponse(content=data, status_code=status_code)
@@ -223,6 +240,7 @@ def create_finetuning_job(
     """
     try:
         token = credentials.credentials
+        
         # 1. Adapterを使用してFastAPIのUploadFileをドメインの抽象型に変換
         domain_file_stream = FastAPIUploadedFileAdapter(training_file)
 
@@ -237,6 +255,7 @@ def create_finetuning_job(
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_create_finetuning_job_presenter()
         
+        # NewFinetuningJobInteractorに時刻サービスをDI
         usecase = new_create_finetuning_job_interactor(
             presenter=presenter,
             job_repo=finetuning_job_repo,          
@@ -244,6 +263,7 @@ def create_finetuning_job(
             auth_service=auth_service,
             file_storage_service=file_storage_service, 
             job_queue_service=job_queue_service,       
+            system_time_service=system_time_service, # ★ 時刻サービスを注入 ★
         )
         controller = CreateFinetuningJobController(usecase)
 
