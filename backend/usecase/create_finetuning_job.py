@@ -84,9 +84,11 @@ class CreateFinetuningJobInteractor:
         
         try:
             # 1. トークンを検証してユーザー情報を取得
+            print("# 1. トークンを検証してユーザー情報を取得")
             user = self.auth_service.verify_token(input.token)
 
             # 2. Agentの存在確認と所有権チェック
+            print("# 2. Agentの存在確認と所有権チェック")
             agent = self.agent_repo.find_by_id(ID(input.agent_id))
             if not agent:
                 raise ValueError(f"Agent with ID {input.agent_id} not found.")
@@ -94,6 +96,7 @@ class CreateFinetuningJobInteractor:
                 raise PermissionError("User does not own this agent.")
                 
             # 3. ファイルを抽象サービスに委譲して共有ストレージに保存
+            print("# 3. ファイルを抽象サービスに委譲して共有ストレージに保存")
             # ユースケースは具体的なストレージ実装を知らない
             file_path = self.file_storage_service.save_training_file(
                 input.training_file, 
@@ -101,6 +104,7 @@ class CreateFinetuningJobInteractor:
             )
 
             # 4. FinetuningJobエンティティを生成（初期ステータス: 'queued'）
+            print("# 4. FinetuningJobエンティティを生成")
             new_job = FinetuningJob(
                 id=ID(0), 
                 agent_id=ID(input.agent_id),
@@ -113,9 +117,11 @@ class CreateFinetuningJobInteractor:
             )
 
             # 5. リポジトリにジョブを永続化
+            print("# 5. リポジトリにジョブを永続化")
             created_job = self.job_repo.create_job(new_job)
 
             # 6. 抽象的なキューサービスを通じてタスクをキューに投入
+            print("# 6. 抽象的なキューサービスを通じてタスクをキューに投入")
             # ユースケースは Celery/Redis の実装を知らない
             self.job_queue_service.enqueue_finetuning_job(
                 created_job.id.value, 
@@ -123,6 +129,7 @@ class CreateFinetuningJobInteractor:
             )
 
             # 7. Presenterに渡してOutput DTOに変換
+            print("# 7. Presenterに渡してOutput DTOに変換")
             output = self.presenter.output(created_job)
             return output, None
             
