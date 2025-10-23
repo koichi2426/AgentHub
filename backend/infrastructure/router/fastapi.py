@@ -1,8 +1,8 @@
 import json
-from typing import Dict, Optional, List # Listをインポート
-from dataclasses import is_dataclass, asdict # dataclassを扱うためにインポート
+from typing import Dict, Optional, List
+from dataclasses import is_dataclass, asdict
 
-from fastapi import APIRouter, Depends, UploadFile, File # ★ UploadFileとFileをインポート ★
+from fastapi import APIRouter, Depends, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -77,10 +77,8 @@ def handle_response(response_dict: Dict, success_code: int = 200):
     status_code = response_dict.get("status", 500)
     data = response_dict.get("data")
 
-    # ▼▼▼ [修正] DTO(dataclass)を辞書に変換する処理を追加 ▼▼▼
     if is_dataclass(data):
         data = asdict(data)
-    # ▲▲▲ 修正ここまで ▲▲▲
 
     if status_code >= 400:
         return JSONResponse(content=data, status_code=status_code)
@@ -229,29 +227,33 @@ def create_finetuning_job(
         # 1. Adapterを使用してFastAPIのUploadFileをドメインの抽象型に変換
         domain_file_stream = FastAPIUploadedFileAdapter(training_file)
 
-        # 2. 組み立て
+        # 2. Input DTO を構築
+        input_data = CreateFinetuningJobInput(
+            token=token,
+            agent_id=agent_id,
+            training_file=domain_file_stream # 抽象化されたファイルストリームを渡す
+        )
+
+        # 3. 組み立て
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_create_finetuning_job_presenter()
         
-        # NewFinetuningJobInteractorは5つの依存関係を受け取る
         usecase = new_create_finetuning_job_interactor(
             presenter=presenter,
-            job_repo=finetuning_job_repo,          # FinetuningJobリポジトリ
+            job_repo=finetuning_job_repo,          
             agent_repo=agent_repo,
             auth_service=auth_service,
-            file_storage_service=file_storage_service, # 抽象化されたファイルストレージ
-            job_queue_service=job_queue_service,       # 抽象化されたジョブキュー
+            file_storage_service=file_storage_service, 
+            job_queue_service=job_queue_service,       
         )
         controller = CreateFinetuningJobController(usecase)
 
-        # 3. Controllerを実行
+        # 4. Controllerを実行 (Input DTOを引数として渡す形式)
         response_dict = controller.execute(
-            token=token,
-            agent_id=agent_id,
-            uploaded_file=training_file # FastAPIのUploadFileを渡す
+            input_data=input_data 
         )
         
-        # 4. 応答 (キューイングに成功したら 201 Created / 202 Accepted)
+        # 5. 応答 (キューイングに成功したら 201 Created)
         return handle_response(response_dict, success_code=201)
     
     except Exception as e:
