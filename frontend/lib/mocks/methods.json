@@ -1,22 +1,22 @@
 [
   {
-    "agentId": "agent-1",
+    "deploymentId": "dep_001",
     "methods": [
       "analyze_input",
       "generate_summary",
-      "filter_candidates"
+      "filter_candidates",
+      "get_realtime_data"
     ]
   },
   {
-    "agentId": "agent-2",
+    "deploymentId": "dep_002",
     "methods": [
-      "respond_to_query",
-      "fetch_customer_info",
-      "update_ticket_status"
+      "query_v2_database",
+      "process_large_file"
     ]
   },
   {
-    "agentId": "agent-3",
+    "deploymentId": "dep_003",
     "methods": [
       "scan_vulnerabilities",
       "report_findings",

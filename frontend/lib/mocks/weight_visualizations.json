@@ -1,9 +1,9 @@
 [
   {
-    "jobId": "job_001",
+    "job_id": "job_001",
     "layers": [
       {
-        "layerName": "layer0",
+        "layer_name": "layer0",
         "weights": [
           {
             "name": "bert.encoder.layer.0.attention.output.dense.weight",
@@ -20,7 +20,7 @@
         ]
       },
       {
-        "layerName": "layer1",
+        "layer_name": "layer1",
         "weights": [
           {
             "name": "bert.encoder.layer.1.attention.output.dense.weight",
@@ -33,10 +33,10 @@
     ]
   },
   {
-    "jobId": "job_003",
+    "job_id": "job_003",
     "layers": [
       {
-        "layerName": "layer0",
+        "layer_name": "layer0",
         "weights": [
           {
             "name": "bert.encoder.layer.0.attention.output.dense.weight",

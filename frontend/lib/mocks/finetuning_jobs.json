@@ -1,26 +1,32 @@
 [
   {
     "id": "job_001",
-    "agentId": "agent-1",
+    "agent_id": "agent-1", 
+    "training_file_path": "/data/training/job_001_initial.txt", 
+    "error_message": null,
     "status": "completed",
-    "createdAt": "2024-10-01T10:00:00Z",
-    "finishedAt": "2024-10-01T12:30:00Z",
-    "modelId": "model_abc_v2"
+    "created_at": "2024-10-01T10:00:00Z",
+    "finished_at": "2024-10-01T12:30:00Z",
+    "model_id": "model_abc_v2"
   },
   {
     "id": "job_002",
-    "agentId": "agent-1",
+    "agent_id": "agent-1",
+    "training_file_path": "/data/training/job_002_running.txt",
+    "error_message": null,
     "status": "running",
-    "createdAt": "2024-10-05T14:00:00Z",
-    "finishedAt": null,
-    "modelId": "model_abc_v3_inprogress"
+    "created_at": "2024-10-05T14:00:00Z",
+    "finished_at": null,
+    "model_id": "model_abc_v3_inprogress"
   },
   {
     "id": "job_003",
-    "agentId": "agent-3",
+    "agent_id": "agent-3",
+    "training_file_path": "/data/training/job_003_failed.txt",
+    "error_message": "Failed due to network timeout during training.",
     "status": "failed",
-    "createdAt": "2024-10-08T09:15:00Z",
-    "finishedAt": "2024-10-08T09:45:00Z",
-    "modelId": "model_internal_v1"
+    "created_at": "2024-10-08T09:15:00Z",
+    "finished_at": "2024-10-08T09:45:00Z",
+    "model_id": null
   }
 ]

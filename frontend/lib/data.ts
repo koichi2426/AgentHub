@@ -67,3 +67,9 @@ export type Visualizations = {
   job_id: string;
   layers: WeightLayer[];
 };
+
+// ★★★ [新規追加] デプロイメントメソッドのモックデータ型定義 ★★★
+export type DeploymentMethodsEntry = {
+  deploymentId: string;
+  methods: string[];
+};
