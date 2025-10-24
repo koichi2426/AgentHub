@@ -2,12 +2,17 @@
 
 from celery import Celery
 import os
-from decouple import config # 環境変数を扱うライブラリ（Python-decoupleなどを想定）
+from decouple import config 
 
-# 環境変数から設定を取得
-# Docker Composeで定義されたサービス名 'redis' を使用
-BROKER_URL = os.getenv('CELERY_BROKER_URL', config('CELERY_BROKER_URL', default='redis://localhost:6379/0'))
-BACKEND_URL = os.getenv('CELERY_RESULT_BACKEND', config('CELERY_RESULT_BACKEND', default='redis://localhost:6379/0'))
+# 環境変数が設定されていない場合に例外を発生させるよう、default引数を設定しない。
+try:
+    # 環境変数からのみ設定値を取得
+    BROKER_URL = config('CELERY_BROKER_URL')
+    BACKEND_URL = config('CELERY_RESULT_BACKEND')
+except Exception as e:
+    # 設定ミスを早期に検出するため、クラッシュさせる
+    print("FATAL ERROR: Celery environment variables CELERY_BROKER_URL and CELERY_RESULT_BACKEND must be set.")
+    raise EnvironmentError("Celery environment configuration is missing.") from e
 
 # Celeryアプリケーションのインスタンス化
 celery_app = Celery(
@@ -22,16 +27,13 @@ celery_app.conf.update(
     task_serializer='json',
     result_serializer='json',
     accept_content=['json'],
-    # タイムゾーンを東京に設定
+    # タイムゾーンは、環境変数や設定ファイルから取得するのが理想だが、ここではコードベースでの標準を設定
     timezone='Asia/Tokyo',
     enable_utc=True,
     
-    # ★ 拡張性のための設定: tasks パッケージ内の全てのタスクを自動検出 ★
-    # 新しいタスクモジュール (finetuning/, deployment/) を追加しても、自動で認識されます。
-    # ここで指定する 'worker.tasks' は、AGENDHUB/worker/tasks/ ディレクトリを指します。
-    include=['worker.tasks'] 
+    # ★ 修正: タスク定義ファイルへの完全なパスを指定し、ワーカーがタスクを認識できるようにする ★
+    include=[
+        'worker.tasks.finetuning.finetuning_tasks', 
+        'worker.tasks.deployment.deployment_tasks', 
+    ]
 )
-
-# autodiscover_tasks を使用する代わりに、include で明示的に指定することで、
-# Workerが起動する際に worker/tasks/ 以下の全タスクをロードします。
-# celery_app.autodiscover_tasks(['worker.tasks']) # (こちらも使用可能)
