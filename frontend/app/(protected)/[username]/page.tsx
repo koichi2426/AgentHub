@@ -12,12 +12,19 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Bot, BookUser, Plus } from "lucide-react";
 import Link from "next/link";
-import agents from "@/lib/mocks/agents.json";
+// import agents from "@/lib/mocks/agents.json"; // モックデータのインポートを削除
 import { notFound, useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { getUser, GetUserResponse } from "@/fetchs/get_user/get_user";
 import Cookies from "js-cookie";
-import { Agent } from "@/lib/data"; // data.tsからAgent型をインポート
+// import { Agent } from "@/lib/data"; // data.tsからAgent型をインポート (バックエンド型に移行するため不要)
+
+// ▼▼▼ [新規追加] エージェント一覧取得Fetchのインポート ▼▼▼
+import {
+  getUserAgents,
+  AgentListItem,
+} from "@/fetchs/get_user_agents/get_user_agents";
+// ▲▲▲ 新規追加ここまで ▲▲▲
 
 type UserProfilePageProps = {
   params: {
@@ -27,7 +34,9 @@ type UserProfilePageProps = {
 
 export default function UserProfilePage({ params }: UserProfilePageProps) {
   const [user, setUser] = useState<GetUserResponse | null>(null);
-  const [userAgents, setUserAgents] = useState<Agent[]>([]);
+  // ▼▼▼ [修正] Stateの型をバックエンドのレスポンス型に合わせる ▼▼▼
+  const [userAgents, setUserAgents] = useState<AgentListItem[]>([]);
+  // ▲▲▲ 修正ここまで ▲▲▲
   const [isLoading, setIsLoading] = useState(true);
   const router = useRouter();
 
@@ -48,10 +57,11 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
         }
 
         setUser(currentUser);
-        const foundUserAgents = agents.filter(
-          (agent) => agent.owner === currentUser.username
-        );
-        setUserAgents(foundUserAgents);
+        
+        // ▼▼▼ [変更] モックデータのフィルタリングを削除し、APIを呼び出す ▼▼▼
+        const agentsResponse = await getUserAgents(token);
+        setUserAgents(agentsResponse.agents);
+        // ▲▲▲ 変更ここまで ▲▲▲
 
       } catch (error) {
         console.error("Failed to fetch user data:", error);
@@ -141,7 +151,8 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                       <div className="flex items-center gap-4">
                         <Bot className="h-6 w-6" />
                         <Link
-                          href={`/${user.username}/${agent.name}`}
+                          // AgentListItemにはownerフィールドがありますが、ここでは安全のためにuser.usernameを使用
+                          href={`/${user.username}/${agent.name}`} 
                           className="text-xl font-bold text-primary hover:underline"
                         >
                           {agent.name}
@@ -150,7 +161,8 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
                     </CardHeader>
                     <CardContent>
                       <p className="text-muted-foreground">
-                        {agent.description}
+                        {/* descriptionがnullの場合に備えてフォールバックを追加 */}
+                        {agent.description ?? "No description provided."} 
                       </p>
                     </CardContent>
                   </Card>
@@ -163,4 +175,3 @@ export default function UserProfilePage({ params }: UserProfilePageProps) {
     </div>
   );
 }
-

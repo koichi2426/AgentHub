@@ -1,0 +1,14 @@
+# Celery Core: ワーカープロセスを動作させる
+celery
+
+# Broker: Celeryとワーカー間のメッセージブローカー (Redis)
+redis
+
+# SQLAlchemy Core: DBセッション管理とリポジトリ層の実装に必要
+SQLAlchemy
+
+# MySQL DB Connector: MySQLデータベースとの通信に必要
+mysql-connector-python
+
+# 環境変数の読み込み (optional, backendと共通でdecoupleを使う場合)
+python-decouple

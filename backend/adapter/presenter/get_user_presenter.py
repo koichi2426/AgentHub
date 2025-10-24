@@ -1,21 +1,20 @@
-from typing import Dict, Any
-from usecase.get_user import GetUserPresenter
+from usecase.get_user import GetUserPresenter, GetUserOutput
 from domain.entities.user import User
 
 
 class GetUserPresenterImpl(GetUserPresenter):
-    def output(self, user: User) -> Dict[str, Any]:
+    def output(self, user: User) -> GetUserOutput:
         """
-        UserドメインオブジェクトをJSONシリアライズ可能な辞書に変換して返す。
+        Userドメインオブジェクトを GetUserOutput DTO に変換して返す。
         パスワードなどの機密情報は含めない。
         """
-        return {
-            "id": user.id,
-            "username": user.username,
-            "name": user.name,
-            "email": user.email,
-            "avatar_url": user.avatar_url,
-        }
+        return GetUserOutput(
+            id=user.id.value,
+            username=user.username,
+            name=user.name,
+            email=user.email.value,
+            avatar_url=user.avatar_url,
+        )
 
 
 def new_get_user_presenter() -> GetUserPresenter:

@@ -37,17 +37,12 @@ class CreateUserInput:
 # Output DTO
 # ======================================
 @dataclass
-class UserOutputDTO:
+class CreateUserOutput:
     id: int
     username: str
     name: str
     email: str
     avatar_url: str
-
-
-@dataclass
-class CreateUserOutput:
-    user: UserOutputDTO
 
 
 # ======================================
@@ -90,9 +85,11 @@ class CreateUserInteractor:
             output = self.presenter.output(created)
             return output, None
         except Exception as e:
+            # ▼▼▼ [修正] エラー時の空DTOもフラットな構造に変更 ▼▼▼
             empty_output = CreateUserOutput(
-                user=UserOutputDTO(id=0, username="", name="", email="", avatar_url="")
+                id=0, username="", name="", email="", avatar_url=""
             )
+            # ▲▲▲ 修正ここまで ▲▲▲
             return empty_output, e
 
 
@@ -101,3 +98,4 @@ class CreateUserInteractor:
 # ======================================
 def new_create_user_interactor(presenter: "CreateUserPresenter", repo: UserRepository, timeout_sec: int = 10) -> CreateUserUseCase:
     return CreateUserInteractor(presenter=presenter, repo=repo, timeout_sec=timeout_sec)
+

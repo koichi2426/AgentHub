@@ -5,9 +5,9 @@ import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
 
 // ★★★ data.ts から必要な型をすべてインポート ★★★
-import type { Agent, FinetuningJob, TrainingLink, Visualizations } from "@/lib/data";
+import type { Agent, FinetuningJob, Deployment, User, TrainingLink, Visualizations } from "@/lib/data"; 
 
-// モックデータのインポート
+// モックデータのインポート (ビルドを通すために unknown as Type[] を使用)
 import agents from "@/lib/mocks/agents.json";
 import jobs from "@/lib/mocks/finetuning_jobs.json";
 import trainingDataLinks from "@/lib/mocks/training_data_links.json"; 
@@ -38,12 +38,21 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     trainingLink: TrainingLink | undefined;
     visualizations: Visualizations | undefined;
   } = useMemo(() => {
-    const foundJob = (jobs as FinetuningJob[]).find((j) => j.id === params.jobid);
+    // データが古い構造でもコンパイルエラーを避けるために unknown 経由でキャスト
+    const allJobs = jobs as unknown as FinetuningJob[];
+    const allAgents = agents as unknown as Agent[];
+    const allTrainingLinks = trainingDataLinks as unknown as TrainingLink[];
+    const allVisualizations = weightVisualizationsData as unknown as Visualizations[];
+    
+    const foundJob = allJobs.find((j) => j.id === params.jobid);
     if (!foundJob) return { agent: undefined, job: undefined, trainingLink: undefined, visualizations: undefined };
 
-    const foundAgent = (agents as Agent[]).find((a) => a.id === foundJob.agentId && a.owner.toLowerCase() === params.username.toLowerCase());
-    const foundTrainingLink = (trainingDataLinks as TrainingLink[]).find((d) => d.jobId === params.jobid);
-    const foundVisualizations = (weightVisualizationsData as Visualizations[]).find((v) => v.jobId === params.jobid);
+    // ★★★ 修正: AgentのIDとJobのagent_idを比較する際に、安全のため両方Stringにキャスト ★★★
+    const foundAgent = allAgents.find((a) => String(a.id) === String(foundJob.agent_id) && a.owner.toLowerCase() === params.username.toLowerCase());
+    
+    // ★★★ 修正: スネークケースのプロパティ名を使用 ★★★
+    const foundTrainingLink = allTrainingLinks.find((d) => d.job_id === params.jobid); 
+    const foundVisualizations = allVisualizations.find((v) => v.job_id === params.jobid); 
 
     return { agent: foundAgent, job: foundJob, trainingLink: foundTrainingLink, visualizations: foundVisualizations };
   }, [params.username, params.jobid]);
@@ -51,16 +60,28 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   if (!agent || !job) {
     notFound();
   }
+  
+  // NOTE: job.model_id は null の可能性があるため、ローカル変数に格納
+  const modelId = job.model_id;
 
   const handleDeleteModel = () => {
-    console.log(`Deleting model: ${job.modelId} associated with job: ${job.id}`);
-    alert(`モデル「${job.modelId}」を削除しました。(シミュレーション)`);
+    console.log(`Deleting model: ${modelId} associated with job: ${job.id}`);
+    if (modelId) {
+      alert(`モデル「${modelId}」を削除しました。(シミュレーション)`);
+    } else {
+      // FinetuningJob.model_id が null の場合は、ジョブ自体を削除する（モデルは存在しない）
+      alert(`ジョブ「${job.id}」に関連づけられたモデルが存在しないため、ジョブを削除します。(シミュレーション)`);
+    }
     router.push(`/${params.username}/${params.agentname}`);
   };
 
   const handleDeployModel = () => {
-    console.log(`Deploying model: ${job.modelId}`);
-    alert(`モデル「${job.modelId}」のデプロイを開始しました。(シミュレーション)`);
+    console.log(`Deploying model: ${modelId}`);
+    if (modelId) {
+      alert(`モデル「${modelId}」のデプロイを開始しました。(シミュレーション)`);
+    } else {
+      alert("モデルIDがありません。デプロイできません。");
+    }
   };
 
   return (

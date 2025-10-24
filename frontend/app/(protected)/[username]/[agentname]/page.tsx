@@ -1,75 +1,147 @@
-import { notFound } from "next/navigation";
+"use client"; // クライアントコンポーネントに変換
+
+import { useState, useEffect } from "react";
+import { notFound, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Cpu, Rocket, Settings } from "lucide-react";
 
-import users from "@/lib/mocks/users.json";
-import agents from "@/lib/mocks/agents.json";
-import rawJobs from "@/lib/mocks/finetuning_jobs.json";
-import rawDeployments from "@/lib/mocks/deployments.json";
+// --- API Fetchers ---
+import { getUser, GetUserResponse } from "@/fetchs/get_user/get_user";
+import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
+import Cookies from "js-cookie";
+
+// ▼▼▼ [新規追加] Finetuning Jobs Fetcherと型をインポート ★★★ ▼▼▼
+import { 
+  getUserFinetuningJobs, 
+  FinetuningJobListItem, 
+} from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
+// ▲▲▲ 新規追加ここまで ★★★ ▲▲▲
 
 import AgentTabFineTuning from "@/components/agent-tabs/agent-tab-finetuning";
 import AgentTabDeployments from "@/components/agent-tabs/agent-tab-deployments";
 import AgentTabSettings from "@/components/agent-tabs/agent-tab-settings";
 
-import type { User, Agent, FinetuningJob, Deployment } from "@/lib/data";
+// Agent の型をバックエンドの AgentListItem に置き換え、他の型はそのまま使用
+import type { User, Agent, FinetuningJob, Deployment } from "@/lib/data"; 
+// NOTE: AgentListItem を FinetuningJob[] に変換して下流コンポーネントに渡します。
+// 厳密には FinetuningJobListItem[] に合わせるべきですが、既存の型互換性を維持します。
+
 
 // ページパラメータ型
 type Params = { username: string; agentname: string };
 
-// JSON モックデータを厳密に型変換（status などを安全にキャスト）
-const jobs: FinetuningJob[] = (rawJobs as unknown as FinetuningJob[]).map(
-  (job) => ({
-    ...job,
-    status: job.status as "completed" | "running" | "failed",
-    finishedAt: job.finishedAt ?? undefined,
-  })
-);
 
-const deployments: Deployment[] = (
-  rawDeployments as unknown as Deployment[]
-).map((dep) => ({
-  ...dep,
-  status: dep.status as "active" | "inactive",
-}));
-
-export default async function AgentPage({
-  params: rawParams,
+export default function AgentPage({
+  params, 
 }: {
-  params: Params | Promise<Params>;
+  params: Params;
 }) {
-  const resolvedParams = await Promise.resolve(rawParams);
-  const { username, agentname } = resolvedParams;
+  const { username, agentname } = params;
+  const router = useRouter();
 
-  const lowerUsername = username.toLowerCase();
-  const lowerAgentname = agentname.toLowerCase();
+  // Stateの定義
+  const [user, setUser] = useState<GetUserResponse | null>(null);
+  const [agent, setAgent] = useState<AgentListItem | null>(null);
+  // ▼▼▼ [修正] ジョブ一覧の State を追加 ★★★ ▼▼▼
+  const [finetuningJobs, setFinetuningJobs] = useState<FinetuningJobListItem[]>([]);
+  // ▲▲▲ 修正ここまで ★★★ ▲▲▲
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null); // エラーハンドリング用
 
-  // --- 対応するユーザーとエージェントを検索 ---
-  const user: User | undefined = (users as User[]).find(
-    (u) => u.name.toLowerCase() === lowerUsername
-  );
+  useEffect(() => {
+    const fetchAgentData = async () => {
+      const token = Cookies.get("auth_token");
+      if (!token) {
+        // トークンがない場合はログインにリダイレクト
+        router.push("/login"); 
+        return;
+      }
 
-  const agent: Agent | undefined = (agents as Agent[]).find(
-    (a) =>
-      a.owner.toLowerCase() === lowerUsername &&
-      a.name.toLowerCase() === lowerAgentname
-  );
+      try {
+        // 1. ユーザー情報を取得
+        const currentUser = await getUser(token);
 
-  if (!user || !agent) notFound();
+        // 2. URLのユーザー名と認証済みユーザーが一致する場合は404
+        if (currentUser.username.toLowerCase() !== username.toLowerCase()) {
+          notFound();
+          return;
+        }
+        setUser(currentUser);
 
-  // --- エージェントに紐づくジョブとデプロイメントを抽出 ---
-  const agentJobs: FinetuningJob[] = jobs.filter(
-    (job) => job.agentId === agent.id
-  );
+        // 3. ユーザーのエージェント一覧を取得
+        const agentsResponse = await getUserAgents(token);
+        
+        // 4. URL パラメータに一致するエージェントを検索
+        const foundAgent = agentsResponse.agents.find(
+          (a) =>
+            a.owner.toLowerCase() === username.toLowerCase() &&
+            a.name.toLowerCase() === agentname.toLowerCase()
+        );
 
-  const modelIds = [
-    `model_${agent.name.toLowerCase().replace(/-/g, "")}_v1_base`,
-    ...agentJobs.map((j) => j.modelId),
-  ];
+        // 5. エージェントが見つからなければ404
+        if (!foundAgent) {
+            notFound();
+            return;
+        }
 
-  const agentDeployments: Deployment[] = deployments.filter((dep) =>
-    modelIds.includes(dep.modelId)
-  );
+        setAgent(foundAgent);
+
+        // 6. ▼▼▼ [新規追加] ファインチューニングジョブ一覧を取得 ★★★ ▼▼▼
+        const jobsResponse = await getUserFinetuningJobs(token);
+        
+        // 7. 現在のエージェントに紐づくジョブのみをフィルタリング
+        const currentAgentJobs = jobsResponse.jobs.filter(
+            (job) => job.agent_id === foundAgent.id
+        );
+
+        setFinetuningJobs(currentAgentJobs);
+        // ▲▲▲ 新規追加ここまで ★★★ ▲▲▲
+
+      } catch (e) {
+        console.error("Failed to fetch agent data:", e);
+        // エージェント情報だけでなく、ジョブ情報取得失敗もキャッチ
+        setError("Failed to load agent or job details. Please check your network or token.");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchAgentData();
+  }, [username, agentname, router]);
+
+
+  // === ローディング・エラー状態の表示 ===
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading agent details...
+      </div>
+    );
+  }
+
+  // 認証済みだがデータ取得でエラーが発生した場合
+  if (error) {
+     return (
+        <div className="container mx-auto max-w-6xl p-4 md:p-10 text-center text-red-500">
+            {error}
+        </div>
+    );
+  }
+
+  // userまたはagentがnullの場合は notFound
+  if (!user || !agent) {
+    return notFound(); 
+  }
+
+  // --- AgentListItemをAgent型に変換 (下流コンポーネント互換性のため) ---
+  const agentCasted = agent as unknown as Agent;
+  const userCasted = user as unknown as User;
+
+  // --- フィルタリングされたジョブデータを、既存の AgentTabFineTuning の型に合わせる ---
+  // NOTE: ここでは FinetuningJobListItem[] を FinetuningJob[] としてキャストします
+  const agentJobsCasted = finetuningJobs as unknown as FinetuningJob[]; 
+  const agentDeployments: Deployment[] = []; // デプロイメントデータはAPI未実装のため空配列を維持
 
   // --- JSX 出力 ---
   return (
@@ -77,13 +149,13 @@ export default async function AgentPage({
       {/* --- ヘッダー --- */}
       <div className="mb-8">
         <h1 className="text-2xl font-normal">
-          <Link href={`/${user.name}`} className="text-primary hover:underline">
-            {user.name}
+          <Link href={`/${user.username}`} className="text-primary hover:underline">
+            {user.username}
           </Link>
           <span className="mx-2 text-muted-foreground">/</span>
           <span className="font-semibold">{agent.name}</span>
         </h1>
-        <p className="mt-2 text-muted-foreground">{agent.description}</p>
+        <p className="mt-2 text-muted-foreground">{agent.description ?? "No description available."}</p>
       </div>
 
       {/* --- タブ --- */}
@@ -105,17 +177,18 @@ export default async function AgentPage({
 
         {/* --- Fine-tuning タブ --- */}
         <TabsContent value="finetuning" className="mt-6">
-          <AgentTabFineTuning user={user} agent={agent} jobs={agentJobs} />
+          {/* ★★★ [修正] 取得したジョブ一覧を AgentTabFineTuning に渡す ★★★ */}
+          <AgentTabFineTuning user={userCasted} agent={agentCasted} jobs={agentJobsCasted} /> 
         </TabsContent>
 
         {/* --- Deployments タブ --- */}
         <TabsContent value="api" className="mt-6">
-          <AgentTabDeployments deployments={agentDeployments} username={user.name} agentname={agent.name}/>
+          <AgentTabDeployments deployments={agentDeployments} username={user.username} agentname={agent.name}/>
         </TabsContent>
 
         {/* --- Settings タブ --- */}
         <TabsContent value="settings" className="mt-6">
-          <AgentTabSettings agent={agent} />
+          <AgentTabSettings agent={agentCasted} />
         </TabsContent>
       </Tabs>
     </div>

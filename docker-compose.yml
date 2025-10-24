@@ -22,6 +22,18 @@ services:
       - API_URL_INTERNAL=${API_URL_INTERNAL}
 
   # ---------------------------------
+  # キューブローカーサービス (Redis)
+  # ---------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: agenthub_redis
+    expose:
+      - "6379" # 内部ポートのみ公開
+    volumes:
+      - redis_data:/data 
+    restart: unless-stopped
+
+  # ---------------------------------
   # バックエンドサービス (FastAPI)
   # ---------------------------------
   backend:
@@ -36,6 +48,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      redis: # Redisへの依存を追加
+        condition: service_started
     environment:
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
@@ -45,6 +59,54 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       ALGORITHM: ${ALGORITHM}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL} # .envから読み込み
+    restart: unless-stopped
+
+  # ---------------------------------
+  # ワーカーサービス (Celery)
+  # ---------------------------------
+  celery_worker:
+    build:
+      context: ./worker # 独立したworkerフォルダを使用
+      dockerfile: Dockerfile
+    container_name: agenthub_celery_worker
+    # Celeryアプリのエントリーポイントと単一実行を保証するコマンド
+    command: celery -A worker.celery_app worker -l info --pool=solo --max-tasks-per-child=1
+    volumes:
+      - ./worker:/app/worker
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      # DB接続情報はワーカーのリポジトリ層で使用
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+      # CeleryがRedisと通信するための設定 (.envから読み込み)
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+      CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT}
+      CELERY_TASK_MAX_RETRIES: ${CELERY_TASK_MAX_RETRIES}
+    restart: unless-stopped
+    
+  # ---------------------------------
+  # ジョブ監視サービス (Celery Flower) - ★ NEW ★
+  # ---------------------------------
+  celery_flower:
+    image: mher/flower:latest
+    container_name: agenthub_celery_flower
+    ports:
+      - "5555:5555" # ホストの5555ポートでFlower UIにアクセス
+    environment:
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL} 
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+    depends_on:
+      - redis
+      - celery_worker
     restart: unless-stopped
 
   # ---------------------------------
@@ -75,3 +137,4 @@ services:
 # ---------------------------------
 volumes:
   mysql_data:
+  redis_data:

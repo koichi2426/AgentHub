@@ -1,3 +1,5 @@
+// frontend/lib/data.ts
+
 // エージェントオブジェクトの型定義
 export type Agent = {
   id: string;
@@ -16,31 +18,34 @@ export type User = {
 };
 
 // ファインチューニングジョブの型定義
+// バックエンドの FinetuningJobListItem DTO (snake_case) に完全に合わせる
 export type FinetuningJob = {
   id: string;
-  agentId: string;
-  status: "completed" | "running" | "failed";
-  createdAt: string;
-  finishedAt?: string | null; // nullも許容
-  modelId: string; // このジョブで生成されたモデルのID
+  agent_id: number;
+  status: "completed" | "running" | "failed" | "queued";
+  training_file_path: string; 
+  error_message: string | null;
+  created_at: string;
+  finished_at: string | null; 
+  model_id: string | null;
 };
 
 // デプロイメント（API）の型定義
 export type Deployment = {
   id:string;
-  modelId: string;
+  model_id: string;
   status: "active" | "inactive";
   endpoint: string;
-  createdAt: string;
+  created_at: string;
 };
 
 // 学習データへのリンク情報の型定義
 export type TrainingLink = {
-  jobId: string;
-  dataUrl: string | null;
-  fileName: string | null;
-  recordCount: number | null;
-  fileSize: string | null;
+  job_id: string;
+  data_url: string | null;
+  file_name: string | null;
+  record_count: number | null;
+  file_size: string | null;
 };
 
 // 重み可視化データの重み部分の型定義
@@ -53,12 +58,18 @@ export type WeightVisualization = {
 
 // 重み可視化データのレイヤー部分の型定義
 export type WeightLayer = {
-  layerName: string;
+  layer_name: string;
   weights: WeightVisualization[];
 };
 
 // ジョブに紐づく重み可視化データ全体の型定義
 export type Visualizations = {
-  jobId: string;
+  job_id: string;
   layers: WeightLayer[];
+};
+
+// ★★★ [新規追加] デプロイメントメソッドのモックデータ型定義 ★★★
+export type DeploymentMethodsEntry = {
+  deploymentId: string;
+  methods: string[];
 };

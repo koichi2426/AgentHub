@@ -1,23 +1,23 @@
 [
   {
-    "jobId": "job_001",
-    "dataUrl": "/training-data/job_001_data.txt",
-    "fileName": "job_001_training_data.txt",
-    "recordCount": 8,
-    "fileSize": "1.5 KB"
+    "job_id": "job_001",
+    "data_url": "/training-data/job_001_data.txt",
+    "file_name": "job_001_training_data.txt",
+    "record_count": 8,
+    "file_size": "1.5 KB"
   },
   {
-    "jobId": "job_002",
-    "dataUrl": null,
-    "fileName": null,
-    "recordCount": null,
-    "fileSize": null
+    "job_id": "job_002",
+    "data_url": null,
+    "file_name": null,
+    "record_count": null,
+    "file_size": null
   },
   {
-    "jobId": "job_003",
-    "dataUrl": "/training-data/job_003_data.txt",
-    "fileName": "job_003_training_data.txt",
-    "recordCount": 5,
-    "fileSize": "0.8 KB"
+    "job_id": "job_003",
+    "data_url": "/training-data/job_003_data.txt",
+    "file_name": "job_003_training_data.txt",
+    "record_count": 5,
+    "file_size": "0.8 KB"
   }
 ]

@@ -8,8 +8,9 @@ from ..value_objects.id import ID
 @dataclass
 class Agent:
     id: ID
-    name: str
+    user_id: ID  # ユーザーエンティティへの参照としてIDを追加
     owner: str  # username or user id
+    name: str
     description: Optional[str]
 
 
@@ -29,14 +30,7 @@ class AgentRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def find_by_owner_and_name(self, owner: str, name: str) -> Optional[Agent]:
-        """
-        owner と agent name から特定のエージェントを取得する
-        """
-        pass
-
-    @abc.abstractmethod
-    def list_by_owner(self, owner: str) -> list[Agent]:
+    def list_by_user_id(self, user_id: "ID") -> list[Agent]:
         """
         指定ユーザーのエージェント一覧を取得する
         """
@@ -64,5 +58,17 @@ class AgentRepository(abc.ABC):
         pass
 
 
-def NewAgent(id: int, name: str, owner: str, description: Optional[str]) -> Agent:
-    return Agent(id=ID(id), name=name, owner=owner, description=description)
+def NewAgent(
+    id: int, user_id: int, owner: str, name: str, description: Optional[str]
+) -> Agent:
+    """
+    Agentエンティティを生成するファクトリ関数
+    """
+    return Agent(
+        id=ID(id),
+        user_id=ID(user_id),
+        owner=owner,
+        name=name,
+        description=description,
+    )
+

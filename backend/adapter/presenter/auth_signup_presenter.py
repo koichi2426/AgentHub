@@ -1,20 +1,19 @@
-from typing import Dict, Any
-from usecase.auth_signup import CreateUserPresenter
+from usecase.auth_signup import CreateUserPresenter, CreateUserOutput
 from domain.entities.user import User
 
 
 class CreateUserPresenterImpl(CreateUserPresenter):
-    def output(self, user: User) -> Dict[str, Any]:
+    def output(self, user: User) -> CreateUserOutput:
         """
-        UserドメインオブジェクトをJSONシリアライズ可能な辞書に変換して返す。
+        Userドメインオブジェクトを CreateUserOutput DTO に変換して返す。
         """
-        return {
-            "id": user.id,
-            "username": user.username,
-            "name": user.name,
-            "email": user.email,
-            "avatar_url": user.avatar_url,
-        }
+        return CreateUserOutput(
+            id=user.id.value,
+            username=user.username,
+            name=user.name,
+            email=user.email.value,
+            avatar_url=user.avatar_url,
+        )
 
 
 def new_auth_signup_presenter() -> CreateUserPresenter:

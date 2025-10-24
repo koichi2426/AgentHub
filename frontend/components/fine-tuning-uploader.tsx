@@ -13,9 +13,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Rocket } from "lucide-react";
 
+// ★★★ [新規追加] Fetcher関数のインポート ★★★
+import { createFinetuningJob } from "@/fetchs/create_finetuning_job/create_finetuning_job";
+import Cookies from "js-cookie";
+
 /**
  * fine-tuning-uploader.tsx
- * ★★★ テキストファイルを選択し、/api/finetuning に送信するコンポーネント ★★★
+ * テキストファイルを選択し、/v1/agents/{agentId}/finetuning に送信するコンポーネント
  */
 export default function FineTuningUploader({
   agentId,
@@ -27,32 +31,46 @@ export default function FineTuningUploader({
 
   const handleUpload = async (): Promise<void> => {
     if (!selectedFile) {
-      // ★★★ アラートメッセージを修正 ★★★
-      alert("テキストファイルを選択してください。");
+      alert("トレーニングデータファイルを選択してください。"); // アラートメッセージを修正
       return;
+    }
+
+    const token = Cookies.get("auth_token");
+    if (!token) {
+        alert("認証トークンが見つかりません。再ログインしてください。");
+        return;
     }
 
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", selectedFile);
-      formData.append("agentId", agentId);
+      // ★★★ Fetcher関数への引数を構築 ★★★
+      const requestData = {
+          trainingFile: selectedFile,
+      };
+      
+      // agentId は string 型で受け取っているため、number に変換
+      const numericAgentId = parseInt(agentId, 10);
+      if (isNaN(numericAgentId)) {
+           throw new Error("Invalid Agent ID format.");
+      }
 
-      const res = await fetch("/api/finetuning", {
-        method: "POST",
-        body: formData,
-      });
+      // ★★★ 新しい Fetcher を使用して API を呼び出す ★★★
+      const result = await createFinetuningJob(
+        requestData,
+        numericAgentId,
+        token
+      );
 
-      if (!res.ok) throw new Error("アップロードに失敗しました");
-
-      alert("ジョブを送信しました。");
+      // 成功レスポンスのメッセージを表示
+      alert(`ジョブID ${result.id} をキューに送信しました: ${result.message}`);
       setSelectedFile(null);
+
     } catch (err: unknown) {
       const message =
         err instanceof Error
           ? err.message
           : "予期しないエラーが発生しました。";
-      alert(message);
+      alert(`送信失敗: ${message}`);
     } finally {
       setUploading(false);
     }
@@ -62,19 +80,16 @@ export default function FineTuningUploader({
     <Card>
       <CardHeader>
         <CardTitle>Submit New Fine-tuning Job</CardTitle>
-        {/* ★★★ 説明文を修正 ★★★ */}
         <CardDescription>
           Upload a Text file containing training data for fine-tuning.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="grid w-full gap-2">
-          {/* ★★★ ラベルとIDを修正 ★★★ */}
           <Label htmlFor="training-data-file">Training Data File (.txt)</Label>
           <Input
             id="training-data-file"
             type="file"
-            // ★★★ accept属性を修正 ★★★
             accept=".txt"
             onChange={(e) => setSelectedFile(e.target.files?.[0] ?? null)}
           />
@@ -84,7 +99,7 @@ export default function FineTuningUploader({
             </p>
           )}
         </div>
-        <Button onClick={handleUpload} disabled={uploading}>
+        <Button onClick={handleUpload} disabled={uploading || !selectedFile}>
           <Rocket className="mr-2 h-4 w-4" />
           {uploading ? "Uploading..." : "Start Job"}
         </Button>

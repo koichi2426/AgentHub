@@ -1,13 +1,12 @@
-from usecase.auth_login import LoginUserPresenter
-from typing import Dict, Any
+from usecase.auth_login import LoginUserPresenter, LoginUserOutput
 
 
 class LoginUserPresenterImpl(LoginUserPresenter):
-    def output(self, token: str) -> Dict[str, Any]:
+    def output(self, token: str) -> LoginUserOutput:
         """
-        JWTトークンをJSONシリアライズ可能な辞書に変換して返す。
+        JWTトークンを LoginUserOutput DTO に変換して返す。
         """
-        return {"token": token}
+        return LoginUserOutput(token=token)
 
 
 def new_login_user_presenter() -> LoginUserPresenter:

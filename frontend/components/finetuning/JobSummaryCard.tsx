@@ -11,13 +11,17 @@ type JobSummaryCardProps = {
 };
 
 export default function JobSummaryCard({ job }: JobSummaryCardProps) {
+  // model_id が null の場合のフォールバックを定義
+  const modelIdentifier = job.model_id || "N/A (Model Not Generated)";
+
   return (
     <Card className="md:col-span-1">
       <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
       <CardContent className="space-y-4 text-sm">
         <div className="flex items-center">
           <Bot className="mr-3 h-5 w-5 text-muted-foreground" />
-          <div><p className="font-semibold">{job.modelId}</p><p className="text-xs text-muted-foreground">Model ID</p></div>
+          {/* ★★★ 修正: modelId -> model_id (フォールバック使用) ★★★ */}
+          <div><p className="font-semibold">{modelIdentifier}</p><p className="text-xs text-muted-foreground">Model ID</p></div>
         </div>
         <div className="flex items-center">
           <CheckCircle className="mr-3 h-5 w-5 text-muted-foreground" />
@@ -25,13 +29,15 @@ export default function JobSummaryCard({ job }: JobSummaryCardProps) {
         </div>
         <div className="flex items-center">
           <Calendar className="mr-3 h-5 w-5 text-muted-foreground" />
-          <div><p>{new Date(job.createdAt).toLocaleString("ja-JP")}</p><p className="text-xs text-muted-foreground">Created At</p></div>
+          {/* ★★★ 修正: createdAt -> created_at ★★★ */}
+          <div><p>{new Date(job.created_at).toLocaleString("ja-JP")}</p><p className="text-xs text-muted-foreground">Created At</p></div>
         </div>
-        {/* この条件分岐(job.finishedAt && ...)により、undefined の場合は何も表示されないため安全です */}
-        {job.finishedAt && (
+        {/* ★★★ 修正: finishedAt -> finished_at ★★★ */}
+        {job.finished_at && (
           <div className="flex items-center">
             <Clock className="mr-3 h-5 w-5 text-muted-foreground" />
-            <div><p>{new Date(job.finishedAt).toLocaleString("ja-JP")}</p><p className="text-xs text-muted-foreground">Finished At</p></div>
+            {/* ★★★ 修正: finishedAt -> finished_at ★★★ */}
+            <div><p>{new Date(job.finished_at).toLocaleString("ja-JP")}</p><p className="text-xs text-muted-foreground">Finished At</p></div>
           </div>
         )}
       </CardContent>

@@ -49,7 +49,7 @@ export default function SignupPage() {
       name,
       email,
       // フォームにない avatar_url はここで仮の値を設定
-      avatar_url: `https://placehold.co/128x128/E0E0E0/757575?text=${username.slice(0, 2).toUpperCase()}`,
+      avatar_url: `https://api.dicebear.com/8.x/bottts/svg?seed=${encodeURIComponent(username)}`,
       password,
     };
 

@@ -34,7 +34,7 @@ export default function WeightVisualizationAccordion({ visualizations }: WeightV
           <CardContent>
             <Accordion type="single" collapsible defaultValue="item-0">
               {visualizations.layers.map((layer, layerIndex) => (
-                <AccordionItem value={`item-${layerIndex}`} key={layer.layerName}>
+                <AccordionItem value={`item-${layerIndex}`} key={layer.layer_name}> {/* ✅ 修正: layerName -> layer_name */}
                   <AccordionTrigger className="text-lg">Layer {layerIndex}</AccordionTrigger>
                   <AccordionContent>
                     <div className="flex flex-col gap-8">
