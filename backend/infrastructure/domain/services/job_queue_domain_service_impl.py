@@ -8,7 +8,7 @@ from decouple import config # 環境変数読み込みのため
 # 1. Celery クライアントの初期化 (このファイル内で完結)
 # -----------------------------------------------------------------
 # 環境変数から設定を取得
-BROKER_URL = os.getenv('CELERY_BROKER_URL', config('CELERY_BROKER_URL', default='redis://redis:6379/0'))
+BROKER_URL = os.getenv('CELERY_BROKER_URL', config('CELERY_BROKER_URL'))
 
 celery_client = Celery(
     'agenthub_client', # クライアントアプリケーション名
