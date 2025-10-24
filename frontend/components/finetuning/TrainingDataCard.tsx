@@ -18,11 +18,14 @@ export default function TrainingDataCard({ trainingLink }: TrainingDataCardProps
         <CardDescription>Click the button below to download the training data used for this job.</CardDescription>
       </CardHeader>
       <CardContent className="flex h-full items-center justify-center pt-2">
-        {trainingLink && trainingLink.dataUrl ? (
-          <a href={trainingLink.dataUrl} download={trainingLink.fileName || true}>
+        {/* 修正1: dataUrl -> data_url のチェック */}
+        {trainingLink && trainingLink.data_url ? (
+          // 修正2: dataUrl -> data_url, fileName -> file_name
+          <a href={trainingLink.data_url} download={trainingLink.file_name || true}>
             <Button className="w-full sm:w-auto">
               <Download className="mr-2 h-4 w-4" />
-              Download Training Data ({trainingLink.fileName?.split('.').pop()})
+              {/* 修正3: fileName -> file_name (存在しない可能性も考慮し?.を使用) */}
+              Download Training Data ({trainingLink.file_name?.split('.').pop()})
             </Button>
           </a>
         ) : (

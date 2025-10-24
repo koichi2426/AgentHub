@@ -103,7 +103,7 @@ class MySQLFinetuningJobRepository(FinetuningJobRepository):
             training_file_path=job.training_file_path,
             status=job.status,
             model_id=job.model_id,
-            created_at=job.created_at or datetime.now(), # DB側でデフォルト値が設定されている場合を想定
+            created_at=job.created_at,
             finished_at=job.finished_at,
             error_message=job.error_message
         )
@@ -155,6 +155,25 @@ class MySQLFinetuningJobRepository(FinetuningJobRepository):
             cursor.execute(sql, (agent_id.value,))
             rows = cursor.fetchall()
             
+        return [self._map_row_to_job(row) for row in rows if row]
+
+    def list_all_by_user(self, user_id: "ID") -> List[FinetuningJob]:
+        """
+        特定のユーザーが所有する全てのエージェントに紐づくジョブ一覧を取得する。
+        （agents テーブルと finetuning_jobs テーブルを JOIN する）
+        """
+        sql = """
+        SELECT
+            fj.id, fj.agent_id, fj.training_file_path, fj.status, fj.model_id, fj.created_at, fj.finished_at, fj.error_message
+        FROM finetuning_jobs fj
+        JOIN agents a ON fj.agent_id = a.id
+        WHERE a.user_id = %s
+        ORDER BY fj.created_at DESC
+        """
+        with self._get_cursor() as cursor:
+            cursor.execute(sql, (user_id.value,))
+            rows = cursor.fetchall()
+        
         return [self._map_row_to_job(row) for row in rows if row]
 
     def update_status(self, job_id: "ID", status: str, **kwargs) -> None:

@@ -1,16 +1,22 @@
 "use client";
 import { useState } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import {
+  Card,
+  CardHeader,
+  CardTitle,
+  CardContent,
+} from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Power } from "lucide-react";
-import type { Deployment } from "@/lib/data";
+import type { Deployment } from "@/lib/data"; // Deployment型をインポート
 
 type DeploymentDetailCardProps = {
   deployment: Deployment;
 };
 
 export default function DeploymentDetailCard({ deployment }: DeploymentDetailCardProps) {
+  // NOTE: deployment.status は "active" | "inactive" の文字列型であり、新しいデータモデルでは問題ない。
   const [apiStatus, setApiStatus] = useState<"active" | "inactive">(deployment.status);
 
   const toggleApiStatus = async () => {
@@ -26,7 +32,7 @@ export default function DeploymentDetailCard({ deployment }: DeploymentDetailCar
       <CardContent className="space-y-6">
         <div className="grid grid-cols-2 gap-y-2">
           <div className="text-sm text-muted-foreground">Model ID</div>
-          <div className="font-mono">{deployment.modelId}</div>
+          <div className="font-mono">{deployment.model_id}</div> {/* ✅ 修正: modelId -> model_id */}
           <div className="text-sm text-muted-foreground">Status</div>
           <div>
             <Badge variant={apiStatus === "active" ? "outline" : "secondary"}>
@@ -37,7 +43,8 @@ export default function DeploymentDetailCard({ deployment }: DeploymentDetailCar
           <div className="text-sm text-muted-foreground">Endpoint</div>
           <div className="font-mono text-xs break-all">{deployment.endpoint}</div>
           <div className="text-sm text-muted-foreground">Created At</div>
-          <div>{new Date(deployment.createdAt).toLocaleString("ja-JP")}</div>
+          {/* ✅ 修正: createdAt -> created_at */}
+          <div>{new Date(deployment.created_at).toLocaleString("ja-JP")}</div>
         </div>
         <div className="pt-2">
           <Button variant={apiStatus === "active" ? "destructive" : "default"} onClick={toggleApiStatus}>

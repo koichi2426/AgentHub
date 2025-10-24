@@ -10,20 +10,16 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
+import type { FinetuningJob } from "@/lib/data"; // ★ 修正: FinetuningJob 型をインポート ★
 
-type Job = {
-  id: string;
-  modelId: string;
-  status: string;
-  createdAt: string;
-};
+// ★ 修正: ローカルの Job 型定義を削除 ★
 
 export default function JobHistoryTable({
   jobs,
   username,
   agentname,
 }: {
-  jobs: Job[];
+  jobs: FinetuningJob[]; // ★ 修正: FinetuningJob[] 型を使用 ★
   username: string;
   agentname: string;
 }) {
@@ -49,13 +45,15 @@ export default function JobHistoryTable({
             }
           >
             <TableCell className="font-mono text-primary">{job.id}</TableCell>
-            <TableCell className="font-mono">{job.modelId}</TableCell>
+            {/* ★ 修正: modelId -> model_id ★ */}
+            <TableCell className="font-mono">{job.model_id}</TableCell>
             <TableCell>
               <Badge variant={job.status === "completed" ? "default" : "secondary"}>
                 {job.status}
               </Badge>
             </TableCell>
-            <TableCell>{new Date(job.createdAt).toLocaleString()}</TableCell>
+            {/* ★ 修正: createdAt -> created_at ★ */}
+            <TableCell>{new Date(job.created_at).toLocaleString()}</TableCell>
           </TableRow>
         ))}
       </TableBody>

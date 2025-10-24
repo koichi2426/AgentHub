@@ -41,6 +41,12 @@ from usecase.create_finetuning_job import CreateFinetuningJobInput, CreateFinetu
 from infrastructure.domain.value_objects.file_data_impl import FastAPIUploadedFileAdapter # ファイルアダプタ
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
+# ▼▼▼ [新規追加] Get Finetuning Jobs 関連のインポート ★★★ ▼▼▼
+from adapter.controller.get_user_finetuning_jobs_controller import GetUserFinetuningJobsController
+from adapter.presenter.get_user_finetuning_jobs_presenter import new_get_user_finetuning_jobs_presenter
+from usecase.get_user_finetuning_jobs import GetUserFinetuningJobsInput, GetUserFinetuningJobsOutput, new_get_user_finetuning_jobs_interactor
+# ▲▲▲ 新規追加ここまで ★★★ ▲▲▲
+
 
 # (Infrastructure / Domain Services)
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
@@ -53,7 +59,7 @@ from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomai
 # ▼▼▼ [新規追加] New Domain Service Impls をインポート ▼▼▼
 from infrastructure.domain.services.file_storage_domain_service_impl import NewFileStorageDomainService
 from infrastructure.domain.services.job_queue_domain_service_impl import NewJobQueueDomainService
-from infrastructure.domain.services.system_time_domain_service_impl import NewSystemTimeDomainService # ★ 時刻サービスをインポート ★
+from infrastructure.domain.services.system_time_domain_service_impl import NewSystemTimeDomainService 
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
 
@@ -71,7 +77,7 @@ oauth2_scheme = HTTPBearer()
 # ▼▼▼ [新規追加] 新しいドメインサービスをインスタンス化 ▼▼▼
 file_storage_service = NewFileStorageDomainService()
 job_queue_service = NewJobQueueDomainService()
-system_time_service = NewSystemTimeDomainService() # ★ 時刻サービスをインスタンス化 ★
+system_time_service = NewSystemTimeDomainService() 
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
 
@@ -278,3 +284,34 @@ def create_finetuning_job(
     except Exception as e:
         return JSONResponse({"error": f"An unexpected error occurred: {e}"}, status_code=500)
 # ▲▲▲ 新規追加ここまで ▲▲▲
+
+
+# ▼▼▼ [新規追加] ユーザーのファインチューニングジョブ一覧取得エンドポイント ★★★ ▼▼▼
+@router.get("/v1/agents/{agent_id}/jobs", response_model=GetUserFinetuningJobsOutput)
+@router.get("/v1/jobs", response_model=GetUserFinetuningJobsOutput)
+def get_user_finetuning_jobs(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
+    """
+    認証されたユーザーが所有する全てのエージェントのファインチューニングジョブ一覧を取得する。
+    """
+    try:
+        token = credentials.credentials
+        
+        # 組み立て
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_get_user_finetuning_jobs_presenter()
+        
+        usecase = new_get_user_finetuning_jobs_interactor(
+            presenter=presenter,
+            job_repo=finetuning_job_repo,
+            auth_service=auth_service,
+        )
+        controller = GetUserFinetuningJobsController(usecase)
+
+        # Controllerを実行 (Input DTOを構築せずに直接トークンを渡す形式)
+        response_dict = controller.execute(token=token)
+        
+        return handle_response(response_dict, success_code=200)
+
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+# ▲▲▲ 新規追加ここまで ★★★ ▲▲▲
