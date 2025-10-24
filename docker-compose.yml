@@ -94,6 +94,22 @@ services:
     restart: unless-stopped
     
   # ---------------------------------
+  # ジョブ監視サービス (Celery Flower) - ★ NEW ★
+  # ---------------------------------
+  celery_flower:
+    image: mher/flower:latest
+    container_name: agenthub_celery_flower
+    ports:
+      - "5555:5555" # ホストの5555ポートでFlower UIにアクセス
+    environment:
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL} 
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+    depends_on:
+      - redis
+      - celery_worker
+    restart: unless-stopped
+
+  # ---------------------------------
   # データベースサービス (MySQL)
   # ---------------------------------
   db:
