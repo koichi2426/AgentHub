@@ -12,3 +12,6 @@ mysql-connector-python
 
 # 環境変数の読み込み (optional, backendと共通でdecoupleを使う場合)
 python-decouple
+
+# SFTP Client: VPSへのファイル転送に必要
+paramiko>=3.0.0
