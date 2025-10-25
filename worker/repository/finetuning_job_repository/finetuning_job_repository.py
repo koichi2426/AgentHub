@@ -9,7 +9,7 @@ from domain.entities.finetuning_job import (
     FinetuningJob,
     FinetuningJobRepository,
 )
-from domain.value_objects.id import ID
+from worker.domain.value_objects.id import ID
 
 # インフラストラクチャ層の依存関係
 from ..config import MySQLConfig
