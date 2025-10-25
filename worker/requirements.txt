@@ -26,3 +26,4 @@ scikit-learn
 tqdm
 safetensors
 onnx
+onnxscript
