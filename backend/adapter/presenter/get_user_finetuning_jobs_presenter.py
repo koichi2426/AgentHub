@@ -22,12 +22,8 @@ class GetUserFinetuningJobsPresenterImpl(GetUserFinetuningJobsPresenter):
                 agent_id=job.agent_id.value,
                 status=job.status,
                 training_file_path=job.training_file_path,
-                # model_id は Optional[ID] なので、値が存在すればその .value を、なければ None を使用
-                model_id=job.model_id.value if job.model_id else None,
-                # created_at と finished_at は、エンティティ内で既に str (ISO 8601) または datetime
-                # (ユースケースで str に変換済み)として扱われている前提でそのまま渡す
-                created_at=job.created_at,
-                finished_at=job.finished_at,
+                created_at=job.created_at.isoformat(), # DBから来たdatetimeをISO文字列に変換
+                finished_at=job.finished_at.isoformat() if job.finished_at else None, # 同上
                 error_message=job.error_message,
             )
             for job in jobs

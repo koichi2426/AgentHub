@@ -30,7 +30,7 @@ export default function JobHistoryTable({
       <TableHeader>
         <TableRow>
           <TableHead>Job ID</TableHead>
-          <TableHead>Model ID</TableHead>
+          {/* Model ID の列を削除 */}
           <TableHead>Status</TableHead>
           <TableHead>Created At</TableHead>
         </TableRow>
@@ -45,8 +45,7 @@ export default function JobHistoryTable({
             }
           >
             <TableCell className="font-mono text-primary">{job.id}</TableCell>
-            {/* ★ 修正: modelId -> model_id ★ */}
-            <TableCell className="font-mono">{job.model_id}</TableCell>
+            {/* ★ 修正: modelId -> model_id のセルを削除 ★ */}
             <TableCell>
               <Badge variant={job.status === "completed" ? "default" : "secondary"}>
                 {job.status}

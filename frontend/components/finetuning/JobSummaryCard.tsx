@@ -1,7 +1,8 @@
 "use client";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Bot, Calendar, CheckCircle, Clock } from "lucide-react";
+// model_id が削除されたため、Bot アイコンは不要
+import { Calendar, CheckCircle, Clock } from "lucide-react";
 // ★★★ data.ts から FinetuningJob 型をインポート ★★★
 import type { FinetuningJob } from "@/lib/data";
 
@@ -11,18 +12,16 @@ type JobSummaryCardProps = {
 };
 
 export default function JobSummaryCard({ job }: JobSummaryCardProps) {
-  // model_id が null の場合のフォールバックを定義
-  const modelIdentifier = job.model_id || "N/A (Model Not Generated)";
+  // model_id が削除されたため、関連する変数を削除
+  // const modelIdentifier = job.model_id || "N/A (Model Not Generated)";
 
   return (
     <Card className="md:col-span-1">
       <CardHeader><CardTitle>Summary</CardTitle></CardHeader>
       <CardContent className="space-y-4 text-sm">
-        <div className="flex items-center">
-          <Bot className="mr-3 h-5 w-5 text-muted-foreground" />
-          {/* ★★★ 修正: modelId -> model_id (フォールバック使用) ★★★ */}
-          <div><p className="font-semibold">{modelIdentifier}</p><p className="text-xs text-muted-foreground">Model ID</p></div>
-        </div>
+        
+        {/* model_id の表示ブロックを削除 */}
+
         <div className="flex items-center">
           <CheckCircle className="mr-3 h-5 w-5 text-muted-foreground" />
           <Badge variant={job.status === "completed" ? "default" : "secondary"}>{job.status}</Badge>

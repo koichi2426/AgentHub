@@ -61,26 +61,25 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     notFound();
   }
   
-  // NOTE: job.model_id は null の可能性があるため、ローカル変数に格納
-  const modelId = job.model_id;
+  // NOTE: job.model_id は削除されたため、ローカル変数も削除
+  // const modelId = job.model_id;
 
   const handleDeleteModel = () => {
-    console.log(`Deleting model: ${modelId} associated with job: ${job.id}`);
-    if (modelId) {
-      alert(`モデル「${modelId}」を削除しました。(シミュレーション)`);
-    } else {
-      // FinetuningJob.model_id が null の場合は、ジョブ自体を削除する（モデルは存在しない）
-      alert(`ジョブ「${job.id}」に関連づけられたモデルが存在しないため、ジョブを削除します。(シミュレーション)`);
-    }
+    // model_id が削除されたため、常にジョブ自体を削除するロジックのみ残す
+    console.log(`Deleting job: ${job.id}`);
+    alert(`ジョブ「${job.id}」を削除します。(シミュレーション)`);
     router.push(`/${params.username}/${params.agentname}`);
   };
 
   const handleDeployModel = () => {
-    console.log(`Deploying model: ${modelId}`);
-    if (modelId) {
-      alert(`モデル「${modelId}」のデプロイを開始しました。(シミュレーション)`);
+    // model_id が削除されたため、ジョブIDに基づいてデプロイするロジックに変更
+    console.log(`Deploying results of job: ${job.id}`);
+    
+    // ジョブのステータスに基づいてデプロイ可能かチェック（例）
+    if (job.status === "completed") {
+      alert(`ジョブ「${job.id}」の結果をデプロイします。(シミュレーション)`);
     } else {
-      alert("モデルIDがありません。デプロイできません。");
+      alert(`ジョブ「${job.id}」はまだ完了していないため、デプロイできません。`);
     }
   };
 
