@@ -1,23 +1,26 @@
 "use client";
 
-import { useMemo } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { notFound } from "next/navigation";
+import Cookies from "js-cookie";
 
-// Type Imports
-import type { Agent, FinetuningJob, Deployment, User, Visualizations } from "@/lib/data"; 
+import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
+import {
+  getUserFinetuningJobs,
+  FinetuningJobListItem,
+} from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
 
-// Mock Data Imports
-import agents from "@/lib/mocks/agents.json";
-import jobs from "@/lib/mocks/finetuning_jobs.json";
-import weightVisualizationsData from "@/lib/mocks/weight_visualizations.json";
+import type { Agent, FinetuningJob, Visualizations } from "@/lib/data";
 
-// Component Imports
 import JobDetailHeader from "@/components/finetuning/JobDetailHeader";
 import JobSummaryCard from "@/components/finetuning/JobSummaryCard";
 import TrainingDataCard from "@/components/finetuning/TrainingDataCard";
 import WeightVisualizationAccordion from "@/components/finetuning/WeightVisualizationAccordion";
 import JobDangerZone from "@/components/finetuning/JobDangerZone";
+
+import weightVisualizationsData from "@/lib/mocks/weight_visualizations.json";
+
 
 type JobDetailPageProps = {
   params: {
@@ -29,30 +32,109 @@ type JobDetailPageProps = {
 
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const router = useRouter();
+  const { username, agentname, jobid } = params;
 
-  const { agent, job, visualizations } : {
-    agent: Agent | undefined;
-    job: FinetuningJob | undefined;
-    visualizations: Visualizations | undefined;
-  } = useMemo(() => {
-    const allJobs = jobs as unknown as FinetuningJob[];
-    const allAgents = agents as unknown as Agent[];
-    const allVisualizations = weightVisualizationsData as unknown as Visualizations[];
-    
-    const foundJob = allJobs.find((j) => j.id === params.jobid);
-    if (!foundJob) return { agent: undefined, job: undefined, visualizations: undefined };
+  const [agentData, setAgentData] = useState<AgentListItem | null>(null);
+  const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
+  const [visualizations, setVisualizations] = useState<Visualizations | undefined>(undefined);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const foundAgent = allAgents.find((a) => String(a.id) === String(foundJob.agent_id) && a.owner.toLowerCase() === params.username.toLowerCase());
-    
-    const foundVisualizations = allVisualizations.find((v) => v.job_id === params.jobid); 
+  useEffect(() => {
+    const fetchJobAndAgentData = async () => {
+      const token = Cookies.get("auth_token");
+      if (!token) {
+        router.push("/login");
+        return;
+      }
 
-    return { agent: foundAgent, job: foundJob, visualizations: foundVisualizations };
-  }, [params.username, params.jobid]);
+      setIsLoading(true);
+      setError(null);
 
-  if (!agent || !job) {
-    notFound();
+      try {
+        const [jobsResponse, agentsResponse] = await Promise.all([
+          getUserFinetuningJobs(token),
+          getUserAgents(token)
+        ]);
+
+        const foundJob = jobsResponse.jobs.find(
+          (j) => String(j.id) === String(jobid)
+        );
+
+        if (!foundJob) {
+            notFound();
+            return;
+        }
+
+        const foundAgent = agentsResponse.agents.find(
+          (a) => String(a.id) === String(foundJob.agent_id)
+        );
+
+        if (!foundAgent) {
+            notFound();
+            return;
+        }
+
+        if (
+            foundAgent.owner.toLowerCase() !== username.toLowerCase() ||
+            foundAgent.name.toLowerCase() !== agentname.toLowerCase()
+        ) {
+            notFound();
+            return;
+        }
+
+        setJobData(foundJob);
+        setAgentData(foundAgent);
+
+        const allVisualizations = weightVisualizationsData as unknown as Visualizations[];
+        const foundVisualizations = allVisualizations.find((v) => String(v.job_id) === String(jobid));
+        setVisualizations(foundVisualizations);
+
+      } catch (e: unknown) {
+        console.error("Failed to fetch job/agent data:", e);
+        let errorMessage = "Failed to load job details. Please try again.";
+        if (e instanceof Error) {
+             if (e.message !== 'NEXT_NOT_FOUND') {
+                errorMessage = e.message;
+             } else {
+                 return;
+             }
+        }
+        setError(errorMessage);
+
+      } finally {
+            setIsLoading(false);
+      }
+    };
+
+    fetchJobAndAgentData();
+  }, [username, agentname, jobid, router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        Loading job details...
+      </div>
+    );
   }
-  
+
+  if (error) {
+     return (
+        <div className="container mx-auto max-w-4xl p-4 md:p-10 text-center text-red-500">
+            Error: {error}
+        </div>
+    );
+  }
+
+  if (!agentData || !jobData) {
+    notFound();
+    return null;
+  }
+
+  const agent = agentData as unknown as Agent;
+  const job = jobData as unknown as FinetuningJob;
+
+
   const handleDeleteModel = () => {
     console.log(`Deleting job: ${job.id}`);
     alert(`ジョブ「${job.id}」を削除します。(シミュレーション)`);
@@ -74,7 +156,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
       <div className="grid gap-6 md:grid-cols-3">
         <JobSummaryCard job={job} />
-        <TrainingDataCard job={job} /> 
+        <TrainingDataCard job={job} />
       </div>
 
       {visualizations && (
