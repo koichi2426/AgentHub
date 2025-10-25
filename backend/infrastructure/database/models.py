@@ -1,8 +1,8 @@
-# backend/infrastructure/database/models.py
-from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text
+import datetime
+from sqlalchemy import Column, Integer, String, ForeignKey, DateTime, Text, BigInteger
+from sqlalchemy.dialects import mysql # JSON 型のインポート用
 from sqlalchemy.orm import declarative_base, relationship
 from typing import Optional
-from datetime import datetime
 
 # 全モデル共通の親クラス
 Base = declarative_base()
@@ -29,7 +29,7 @@ class User(Base):
     # ドメインモデルの `password_hash: str` に対応
     password_hash = Column(String(255), nullable=False)
 
-    # Agent モデルとのリレーションシップを定義 (オプション)
+    # Agent モデルとのリレーションシップを定義
     agents = relationship("Agent", back_populates="user")
 
 # ----------------- Agent テーブル定義 -----------------
@@ -51,10 +51,10 @@ class Agent(Base):
     # ドメインモデルの `description: Optional[str]` に対応
     description = Column(String(1000), nullable=True)
 
-    # User モデルへのリレーションシップを定義 (オプション)
+    # User モデルへのリレーションシップを定義
     user = relationship("User", back_populates="agents")
     
-    # FinetuningJob モデルとのリレーションシップを定義 (オプション)
+    # FinetuningJob モデルとのリレーションシップを定義
     finetuning_jobs = relationship("FinetuningJob", back_populates="agent")
 
 
@@ -74,11 +74,10 @@ class FinetuningJob(Base):
     # ドメインモデルの `status: str` に対応
     status = Column(String(50), nullable=False, index=True)
     
-    # ドメインモデルの `model_id: Optional[ID]` に対応
-    model_id = Column(String(255), nullable=True)
+    # ★ model_id は削除 ★
     
     # ドメインモデルの `created_at: datetime` に対応
-    created_at = Column(DateTime, nullable=False, default=datetime.utcnow) # ★ datetime.utcnow が正しく参照される ★
+    created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow) 
     
     # ドメインモデルの `finished_at: Optional[datetime]` に対応
     finished_at = Column(DateTime, nullable=True)
@@ -86,5 +85,23 @@ class FinetuningJob(Base):
     # ドメインモデルの `error_message: Optional[str]` に対応
     error_message = Column(Text, nullable=True)
     
-    # Agent モデルへのリレーションシップを定義 (オプション)
+    # Agent モデルへのリレーションシップを定義
     agent = relationship("Agent", back_populates="finetuning_jobs")
+
+
+# ----------------- WeightVisualization テーブル定義 (新規追加) -----------------
+class WeightVisualization(Base):
+    """
+    ファインチューニングジョブの結果として生成された、重み変化の可視化データ。
+    """
+    __tablename__ = "weight_visualizations"
+
+    # job_id は主キーであり、FinetuningJob への外部キーでもある
+    job_id = Column(Integer, ForeignKey("finetuning_jobs.id", ondelete="CASCADE"), primary_key=True)
+
+    # layers_data はネストされた視覚化情報（JSON文字列）を格納する
+    # MySQL 5.7+ または MariaDB 10.2+ では JSON 型が推奨される
+    layers_data = Column(mysql.JSON, nullable=False)
+
+    # FinetuningJob モデルへのリレーションシップを定義 (オプション)
+    job = relationship("FinetuningJob", backref="visualization", uselist=False)
