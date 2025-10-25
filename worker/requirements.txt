@@ -15,3 +15,13 @@ python-decouple
 
 # SFTP Client: VPSへのファイル転送に必要
 paramiko>=3.0.0
+
+# --- 機械学習 / トランスフォーマー / 可視化に必要な依存関係 ---
+torch
+numpy
+matplotlib
+transformers
+onnxruntime
+scikit-learn
+tqdm
+safetensors
