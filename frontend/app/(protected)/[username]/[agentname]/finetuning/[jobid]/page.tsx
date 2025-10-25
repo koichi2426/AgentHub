@@ -10,6 +10,8 @@ import {
   getUserFinetuningJobs,
   FinetuningJobListItem,
 } from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
+// ★★★ 新規追加: 可視化データ Fetcherと型 ★★★
+import { getWeightVisualizations, GetWeightVisualizationsResponse } from "@/fetchs/get_weight_visualizations/get_weight_visualizations";
 
 import type { Agent, FinetuningJob, Visualizations } from "@/lib/data";
 
@@ -18,8 +20,6 @@ import JobSummaryCard from "@/components/finetuning/JobSummaryCard";
 import TrainingDataCard from "@/components/finetuning/TrainingDataCard";
 import WeightVisualizationAccordion from "@/components/finetuning/WeightVisualizationAccordion";
 import JobDangerZone from "@/components/finetuning/JobDangerZone";
-
-import weightVisualizationsData from "@/lib/mocks/weight_visualizations.json";
 
 
 type JobDetailPageProps = {
@@ -36,7 +36,8 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
   const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
-  const [visualizations, setVisualizations] = useState<Visualizations | undefined>(undefined);
+  // ★★★ Visualizations の型を API レスポンスの型に合わせる (互換性のために as unknown as Visualizations を使用) ★★★
+  const [visualizations, setVisualizations] = useState<GetWeightVisualizationsResponse | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -52,6 +53,7 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
       setError(null);
 
       try {
+        // 1. ジョブ一覧とエージェント一覧を並行取得
         const [jobsResponse, agentsResponse] = await Promise.all([
           getUserFinetuningJobs(token),
           getUserAgents(token)
@@ -83,11 +85,21 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             return;
         }
 
+        // 2. 可視化データの取得 (ジョブが完了している場合のみ)
+        let foundVisualizations: GetWeightVisualizationsResponse | undefined = undefined;
+        
+        if (foundJob.status === "completed") {
+            try {
+                // jobid を使って可視化データを取得
+                foundVisualizations = await getWeightVisualizations(token, jobid);
+            } catch (visError) {
+                console.warn(`WARN: Could not fetch visualizations for job ${jobid}.`, visError);
+                // 可視化データがないことは致命的ではないので、エラーはセットしない
+            }
+        }
+        
         setJobData(foundJob);
         setAgentData(foundAgent);
-
-        const allVisualizations = weightVisualizationsData as unknown as Visualizations[];
-        const foundVisualizations = allVisualizations.find((v) => String(v.job_id) === String(jobid));
         setVisualizations(foundVisualizations);
 
       } catch (e: unknown) {
@@ -131,8 +143,11 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     return null;
   }
 
+  // APIデータを下流コンポーネントが期待する型に変換
   const agent = agentData as unknown as Agent;
   const job = jobData as unknown as FinetuningJob;
+  // Visualizations は as unknown as Visualizations で下流コンポーネントへ渡す
+  const visualizationsCasted = visualizations as unknown as Visualizations | undefined;
 
 
   const handleDeleteModel = () => {
@@ -159,8 +174,8 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
         <TrainingDataCard job={job} />
       </div>
 
-      {visualizations && (
-        <WeightVisualizationAccordion visualizations={visualizations} />
+      {visualizationsCasted && (
+        <WeightVisualizationAccordion visualizations={visualizationsCasted} />
       )}
 
       <JobDangerZone job={job} onDelete={handleDeleteModel} />
