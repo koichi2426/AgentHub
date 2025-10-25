@@ -45,6 +45,8 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      # --- Mount SSH Key (Read-Only) ---
+      - ${VPS_KEY_HOST_PATH}:${VPS_KEY_FILE_PATH}:ro
     depends_on:
       db:
         condition: service_healthy
@@ -60,6 +62,15 @@ services:
       ALGORITHM: ${ALGORITHM}
       ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
       CELERY_BROKER_URL: ${CELERY_BROKER_URL} # .envから読み込み
+      # --- SFTP Storage Settings ---
+      VPS_IP: ${VPS_IP}
+      VPS_USER: ${VPS_USER}
+      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} # <-- 追加
+      VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
+      # Set defaults for optional vars to suppress warnings
+      VPS_PORT: ${VPS_PORT:-22}
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/models}
     restart: unless-stopped
 
   # ---------------------------------
@@ -74,6 +85,8 @@ services:
     command: celery -A worker.celery_app worker -l info --pool=solo --max-tasks-per-child=1
     volumes:
       - ./worker:/app/worker
+      # --- Mount SSH Key (Read-Only) ---
+      - ${VPS_KEY_HOST_PATH}:${VPS_KEY_FILE_PATH}:ro
     depends_on:
       db:
         condition: service_healthy
@@ -91,6 +104,15 @@ services:
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
       CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT}
       CELERY_TASK_MAX_RETRIES: ${CELERY_TASK_MAX_RETRIES}
+      # --- SFTP Storage Settings ---
+      VPS_IP: ${VPS_IP}
+      VPS_USER: ${VPS_USER}
+      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} # <-- 追加
+      VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
+      # Set defaults for optional vars to suppress warnings
+      VPS_PORT: ${VPS_PORT:-22}
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/models}
     restart: unless-stopped
     
   # ---------------------------------
@@ -138,3 +160,4 @@ services:
 volumes:
   mysql_data:
   redis_data:
+

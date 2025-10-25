@@ -11,5 +11,6 @@ python-jose[cryptography]
 celery
 redis
 python-decouple
-# --- MISSING DEPENDENCY FOR FILE UPLOAD ---
+# --- FILE UPLOAD & SFTP ---
 python-multipart
+paramiko
