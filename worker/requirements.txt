@@ -25,3 +25,4 @@ onnxruntime
 scikit-learn
 tqdm
 safetensors
+onnx
