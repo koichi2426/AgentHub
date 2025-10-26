@@ -44,9 +44,6 @@ export default function DeploymentDetailCard({ deployment }: DeploymentDetailCar
 
           <div className="text-sm text-muted-foreground">Endpoint</div>
           <div className="font-mono text-xs break-all">{deployment.endpoint}</div>
-
-          <div className="text-sm text-muted-foreground">Deployed At</div>
-          <div>{new Date(deployment.deployed_at).toLocaleString("ja-JP")}</div>
           
         </div>
         <div className="pt-2">

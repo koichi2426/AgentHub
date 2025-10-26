@@ -41,10 +41,8 @@ export default function DeploymentDetailPage({
     const foundUser = (users as User[]).find((u) => u.name.toLowerCase() === lowerUsername);
     const foundAgent = (agents as Agent[]).find((a) => a.owner.toLowerCase() === lowerUsername && a.name.toLowerCase() === lowerAgentname);
     
-    // Deployment型のフィールド名は job_id / deployed_at に修正済みと仮定して処理はそのまま
     const foundDeployment = (rawDeployments as unknown as Deployment[]).find((d) => d.id === deploymentid);
     
-    // メソッドデータを検索 (DeploymentMethodsEntry を使用)
     const allMethods = rawMethods as DeploymentMethodsEntry[];
     const methodEntry = allMethods.find((m) => m.deploymentId === deploymentid);
     

@@ -11,7 +11,6 @@ class Deployment:
     job_id: ID
     status: str
     endpoint: Optional[str]
-    deployed_at: Optional[str]
 
 
 class DeploymentRepository(abc.ABC):
@@ -56,6 +55,5 @@ def NewDeployment(
     job_id: int,
     status: str,
     endpoint: Optional[str],
-    deployed_at: Optional[str],
 ) -> Deployment:
-    return Deployment(id=ID(id), job_id=ID(job_id), status=status, endpoint=endpoint, deployed_at=deployed_at)
+    return Deployment(id=ID(id), job_id=ID(job_id), status=status, endpoint=endpoint)

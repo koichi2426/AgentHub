@@ -34,7 +34,6 @@ export type Deployment = {
   job_id: string; 
   status: "active" | "inactive";
   endpoint: string;
-  deployed_at: string; 
 };
 
 // 学習データへのリンク情報の型定義
