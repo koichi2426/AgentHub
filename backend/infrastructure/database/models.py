@@ -74,8 +74,6 @@ class FinetuningJob(Base):
     # ドメインモデルの `status: str` に対応
     status = Column(String(50), nullable=False, index=True)
     
-    # ★ model_id は削除 ★
-    
     # ドメインモデルの `created_at: datetime` に対応
     created_at = Column(DateTime, nullable=False, default=datetime.datetime.utcnow) 
     

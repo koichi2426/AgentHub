@@ -45,7 +45,6 @@ export default function JobHistoryTable({
             }
           >
             <TableCell className="font-mono text-primary">{job.id}</TableCell>
-            {/* ★ 修正: modelId -> model_id のセルを削除 ★ */}
             <TableCell>
               <Badge variant={job.status === "completed" ? "default" : "secondary"}>
                 {job.status}
