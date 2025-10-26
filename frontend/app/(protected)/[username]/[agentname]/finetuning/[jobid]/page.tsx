@@ -1,3 +1,5 @@
+// frontend/app/(protected)/[username]/[agentname]/finetuning/[jobid]/page.tsx
+
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,8 +12,15 @@ import {
   getUserFinetuningJobs,
   FinetuningJobListItem,
 } from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
-// ★★★ 新規追加: 可視化データ Fetcherと型 ★★★
-import { getWeightVisualizations, GetWeightVisualizationsResponse } from "@/fetchs/get_weight_visualizations/get_weight_visualizations";
+// ★★★ 可視化データ Fetcherと型をインポート ★★★
+import { 
+  getWeightVisualizations, 
+  GetWeightVisualizationsResponse, 
+  LayerVisualizationOutput, // 変換のために使用
+  WeightVisualizationDetail // 変換のために使用
+} from "@/fetchs/get_weight_visualizations/get_weight_visualizations";
+// ★★★ API_URL のインポートを追加 ★★★
+import { API_URL } from "@/fetchs/config"; 
 
 import type { Agent, FinetuningJob, Visualizations } from "@/lib/data";
 
@@ -30,13 +39,17 @@ type JobDetailPageProps = {
   };
 };
 
+// 画像プロキシのベース URL (FastAPI側で定義したパス)
+const VISUALS_BASE_URL = `${API_URL}/v1/visuals/`;
+
+
 export default function JobDetailPage({ params }: JobDetailPageProps) {
   const router = useRouter();
   const { username, agentname, jobid } = params;
 
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
   const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
-  // ★★★ Visualizations の型を API レスポンスの型に合わせる (互換性のために as unknown as Visualizations を使用) ★★★
+  // Visualizations の型を API レスポンスの型に合わせる
   const [visualizations, setVisualizations] = useState<GetWeightVisualizationsResponse | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -90,17 +103,41 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
         
         if (foundJob.status === "completed") {
             try {
-                // jobid を使って可視化データを取得
-                foundVisualizations = await getWeightVisualizations(token, jobid);
+                // jobid を使って可視化データを取得 (相対パスが含まれる)
+                const rawVisualizations = await getWeightVisualizations(token, jobid);
+                
+                // ★★★ ここで相対パスを完全なURLに変換するロジックを実行 ★★★
+                const transformedVisualizations: GetWeightVisualizationsResponse = {
+                    ...rawVisualizations,
+                    layers: rawVisualizations.layers.map(layer => ({
+                        ...layer,
+                        weights: layer.weights.map(weight => ({
+                            ...weight,
+                            // 相対パスにベースURLを結合して完全なURLにする
+                            before_url: `${VISUALS_BASE_URL}${weight.before_url}`,
+                            after_url: `${VISUALS_BASE_URL}${weight.after_url}`,
+                            delta_url: `${VISUALS_BASE_URL}${weight.delta_url}`,
+                        }))
+                    }))
+                };
+
+                foundVisualizations = transformedVisualizations;
+
             } catch (visError) {
                 console.warn(`WARN: Could not fetch visualizations for job ${jobid}.`, visError);
                 // 可視化データがないことは致命的ではないので、エラーはセットしない
             }
         }
         
+        // ログ出力
+        console.log("--- Visualizations Data Fetched (Transformed) ---");
+        console.log("Job Status:", foundJob.status);
+        console.log("Found Visualizations:", foundVisualizations);
+        console.log("-----------------------------------");
+        
         setJobData(foundJob);
         setAgentData(foundAgent);
-        setVisualizations(foundVisualizations);
+        setVisualizations(foundVisualizations); // 完全なURLを持ったデータをセット
 
       } catch (e: unknown) {
         console.error("Failed to fetch job/agent data:", e);
@@ -144,9 +181,9 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
   }
 
   // APIデータを下流コンポーネントが期待する型に変換
+  // VisualizationsCasted は完全なURLを持つ
   const agent = agentData as unknown as Agent;
   const job = jobData as unknown as FinetuningJob;
-  // Visualizations は as unknown as Visualizations で下流コンポーネントへ渡す
   const visualizationsCasted = visualizations as unknown as Visualizations | undefined;
 
 
