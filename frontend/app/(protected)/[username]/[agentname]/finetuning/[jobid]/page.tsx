@@ -12,14 +12,10 @@ import {
   getUserFinetuningJobs,
   FinetuningJobListItem,
 } from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
-// ★★★ 可視化データ Fetcherと型をインポート ★★★
 import { 
   getWeightVisualizations, 
   GetWeightVisualizationsResponse, 
-  LayerVisualizationOutput, // 変換のために使用
-  WeightVisualizationDetail // 変換のために使用
 } from "@/fetchs/get_weight_visualizations/get_weight_visualizations";
-// ★★★ API_URL のインポートを追加 ★★★
 import { API_URL } from "@/fetchs/config"; 
 
 import type { Agent, FinetuningJob, Visualizations } from "@/lib/data";
@@ -39,7 +35,6 @@ type JobDetailPageProps = {
   };
 };
 
-// 画像プロキシのベース URL (FastAPI側で定義したパス)
 const VISUALS_BASE_URL = `${API_URL}/v1/visuals/`;
 
 
@@ -49,7 +44,6 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
   const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
-  // Visualizations の型を API レスポンスの型に合わせる
   const [visualizations, setVisualizations] = useState<GetWeightVisualizationsResponse | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -66,7 +60,6 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
       setError(null);
 
       try {
-        // 1. ジョブ一覧とエージェント一覧を並行取得
         const [jobsResponse, agentsResponse] = await Promise.all([
           getUserFinetuningJobs(token),
           getUserAgents(token)
@@ -98,22 +91,18 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             return;
         }
 
-        // 2. 可視化データの取得 (ジョブが完了している場合のみ)
         let foundVisualizations: GetWeightVisualizationsResponse | undefined = undefined;
         
         if (foundJob.status === "completed") {
             try {
-                // jobid を使って可視化データを取得 (相対パスが含まれる)
                 const rawVisualizations = await getWeightVisualizations(token, jobid);
                 
-                // ★★★ ここで相対パスを完全なURLに変換するロジックを実行 ★★★
                 const transformedVisualizations: GetWeightVisualizationsResponse = {
                     ...rawVisualizations,
                     layers: rawVisualizations.layers.map(layer => ({
                         ...layer,
                         weights: layer.weights.map(weight => ({
                             ...weight,
-                            // 相対パスにベースURLを結合して完全なURLにする
                             before_url: `${VISUALS_BASE_URL}${weight.before_url}`,
                             after_url: `${VISUALS_BASE_URL}${weight.after_url}`,
                             delta_url: `${VISUALS_BASE_URL}${weight.delta_url}`,
@@ -125,19 +114,12 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
 
             } catch (visError) {
                 console.warn(`WARN: Could not fetch visualizations for job ${jobid}.`, visError);
-                // 可視化データがないことは致命的ではないので、エラーはセットしない
             }
         }
         
-        // ログ出力
-        console.log("--- Visualizations Data Fetched (Transformed) ---");
-        console.log("Job Status:", foundJob.status);
-        console.log("Found Visualizations:", foundVisualizations);
-        console.log("-----------------------------------");
-        
         setJobData(foundJob);
         setAgentData(foundAgent);
-        setVisualizations(foundVisualizations); // 完全なURLを持ったデータをセット
+        setVisualizations(foundVisualizations);
 
       } catch (e: unknown) {
         console.error("Failed to fetch job/agent data:", e);
@@ -180,8 +162,6 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     return null;
   }
 
-  // APIデータを下流コンポーネントが期待する型に変換
-  // VisualizationsCasted は完全なURLを持つ
   const agent = agentData as unknown as Agent;
   const job = jobData as unknown as FinetuningJob;
   const visualizationsCasted = visualizations as unknown as Visualizations | undefined;
@@ -193,18 +173,9 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
     router.push(`/${params.username}/${params.agentname}`);
   };
 
-  const handleDeployModel = () => {
-    console.log(`Deploying results of job: ${job.id}`);
-    if (job.status === "completed") {
-      alert(`ジョブ「${job.id}」の結果をデプロイします。(シミュレーション)`);
-    } else {
-      alert(`ジョブ「${job.id}」はまだ完了していないため、デプロイできません。`);
-    }
-  };
-
   return (
     <div className="container mx-auto max-w-4xl p-4 md:p-10">
-      <JobDetailHeader agent={agent} job={job} params={params} onDeploy={handleDeployModel} />
+      <JobDetailHeader agent={agent} job={job} params={params} /> 
 
       <div className="grid gap-6 md:grid-cols-3">
         <JobSummaryCard job={job} />
