@@ -8,10 +8,10 @@ from ..value_objects.id import ID
 @dataclass
 class Deployment:
     id: ID
-    model_id: ID
-    status: str  # e.g. 'active' | 'inactive'
+    job_id: ID
+    status: str
     endpoint: Optional[str]
-    created_at: Optional[str]
+    deployed_at: Optional[str]
 
 
 class DeploymentRepository(abc.ABC):
@@ -37,9 +37,9 @@ class DeploymentRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def find_by_model_id(self, model_id: "ID") -> list[Deployment]:
+    def find_by_job_id(self, job_id: "ID") -> list[Deployment]:
         """
-        model_id に紐づくデプロイメントを検索する
+        job_id に紐づくデプロイメントを検索する
         """
         pass
 
@@ -53,9 +53,9 @@ class DeploymentRepository(abc.ABC):
 
 def NewDeployment(
     id: int,
-    model_id: int,
+    job_id: int,
     status: str,
     endpoint: Optional[str],
-    created_at: Optional[str],
+    deployed_at: Optional[str],
 ) -> Deployment:
-    return Deployment(id=ID(id), model_id=ID(model_id), status=status, endpoint=endpoint, created_at=created_at)
+    return Deployment(id=ID(id), job_id=ID(job_id), status=status, endpoint=endpoint, deployed_at=deployed_at)

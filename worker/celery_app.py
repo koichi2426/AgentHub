@@ -1,5 +1,3 @@
-# AGENTHUB/worker/celery_app.py
-
 from celery import Celery
 import os
 from decouple import config 
@@ -31,9 +29,8 @@ celery_app.conf.update(
     timezone='Asia/Tokyo',
     enable_utc=True,
     
-    # ★ 修正: タスク定義ファイルへの完全なパスを指定し、ワーカーがタスクを認識できるようにする ★
+    # ★ 修正: 削除された deployment タスクのインポートをリストから削除 ★
     include=[
         'worker.tasks.finetuning.finetuning_tasks', 
-        'worker.tasks.deployment.deployment_tasks', 
     ]
 )
