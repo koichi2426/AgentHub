@@ -65,12 +65,13 @@ services:
       # --- SFTP Storage Settings ---
       VPS_IP: ${VPS_IP}
       VPS_USER: ${VPS_USER}
-      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} # <-- 追加
+      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} 
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
-      # Set defaults for optional vars to suppress warnings
+      # Set defaults for optional vars
       VPS_PORT: ${VPS_PORT:-22}
       VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/training_data}
       VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/visualizations} # <-- backend にも追加 (一貫性のため)
     restart: unless-stopped
 
   # ---------------------------------
@@ -93,13 +94,13 @@ services:
       redis:
         condition: service_started
     environment:
-      # DB接続情報はワーカーのリポジトリ層で使用
+      # DB接続情報
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      # CeleryがRedisと通信するための設定 (.envから読み込み)
+      # Celery 設定
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
       CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT}
@@ -107,22 +108,23 @@ services:
       # --- SFTP Storage Settings ---
       VPS_IP: ${VPS_IP}
       VPS_USER: ${VPS_USER}
-      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} # <-- 追加
+      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} 
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
-      # Set defaults for optional vars to suppress warnings
+      # Set defaults for optional vars
       VPS_PORT: ${VPS_PORT:-22}
       VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/training_data}
       VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/visualizations} # <-- これを追加
     restart: unless-stopped
     
   # ---------------------------------
-  # ジョブ監視サービス (Celery Flower) - ★ NEW ★
+  # ジョブ監視サービス (Celery Flower)
   # ---------------------------------
   celery_flower:
     image: mher/flower:latest
     container_name: agenthub_celery_flower
     ports:
-      - "5555:5555" # ホストの5555ポートでFlower UIにアクセス
+      - "5555:5555"
     environment:
       CELERY_BROKER_URL: ${CELERY_BROKER_URL} 
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}

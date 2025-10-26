@@ -1,8 +1,7 @@
 import abc
 from dataclasses import dataclass
-from typing import Optional, List # Listを追加
+from typing import Optional, List
 
-# 外部依存性
 from domain.value_objects.id import ID
 from datetime import datetime
 
@@ -15,12 +14,11 @@ class FinetuningJob:
     """
     id: ID
     agent_id: ID
-    training_file_path: str   # 必須: ワーカーがファイルを読み込むための共有ストレージパス
-    status: str               # e.g. 'queued' | 'running' | 'completed' | 'failed'
-    model_id: Optional[ID]    # 生成されたモデルのID
+    training_file_path: str
+    status: str
     created_at: datetime
     finished_at: Optional[datetime]
-    error_message: Optional[str] # 失敗時のエラー内容
+    error_message: Optional[str]
 
 
 class FinetuningJobRepository(abc.ABC):
@@ -62,15 +60,14 @@ class FinetuningJobRepository(abc.ABC):
     @abc.abstractmethod
     def list_all_by_user(self, user_id: "ID") -> List[FinetuningJob]:
         """
-        ★ 追加 ★: 特定のユーザーが所有する全てのエージェントに紐づくジョブ一覧を取得する。
-        （DB実装では、User -> Agent -> FinetuningJob の JOIN が必要）
+        特定のユーザーが所有する全てのエージェントに紐づくジョブ一覧を取得する。
         """
         pass
 
     @abc.abstractmethod
-    def update_status(self, job_id: "ID", status: str, **kwargs) -> None:
+    def update_job(self, job: FinetuningJob) -> FinetuningJob:
         """
-        ジョブのステータスとメタデータ（finished_at, model_id, error_messageなど）を更新する
+        FinetuningJobエンティティの状態をDBに更新する
         """
         pass
 
@@ -89,7 +86,6 @@ def NewFinetuningJob(
     status: str,
     created_at: datetime,
     finished_at: Optional[datetime],
-    model_id: Optional[int],
     error_message: Optional[str],
 ) -> FinetuningJob:
     """
@@ -102,6 +98,5 @@ def NewFinetuningJob(
         status=status,
         created_at=created_at,
         finished_at=finished_at,
-        model_id=ID(model_id) if model_id is not None else None,
         error_message=error_message,
     )

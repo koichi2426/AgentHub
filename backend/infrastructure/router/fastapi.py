@@ -1,11 +1,13 @@
 import json
-from typing import Dict, Optional, List
+from typing import Dict, Union, Any, List, Optional
 from dataclasses import is_dataclass, asdict
-from datetime import datetime # JSON変換ロジックで使用
+from datetime import datetime 
+import mimetypes 
+from io import BytesIO 
 
-from fastapi import APIRouter, Depends, UploadFile, File
+from fastapi import APIRouter, Depends, UploadFile, File, Path
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 # --- Controller / Presenter / Usecase imports ---
@@ -41,26 +43,38 @@ from usecase.create_finetuning_job import CreateFinetuningJobInput, CreateFinetu
 from infrastructure.domain.value_objects.file_data_impl import FastAPIUploadedFileAdapter # ファイルアダプタ
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
-# ▼▼▼ [新規追加] Get Finetuning Jobs 関連のインポート ★★★ ▼▼▼
+# ▼▼▼ [新規追加] Get Finetuning Jobs 関連のインポート ▼▼▼
 from adapter.controller.get_user_finetuning_jobs_controller import GetUserFinetuningJobsController
 from adapter.presenter.get_user_finetuning_jobs_presenter import new_get_user_finetuning_jobs_presenter
 from usecase.get_user_finetuning_jobs import GetUserFinetuningJobsInput, GetUserFinetuningJobsOutput, new_get_user_finetuning_jobs_interactor
-# ▲▲▲ 新規追加ここまで ★★★ ▲▲▲
+# ▲▲▲ 新規追加ここまで ▲▲▲
+
+# ▼▼▼ [新規追加] Get Weight Visualizations 関連のインポート ▼▼▼
+from adapter.controller.get_weight_visualizations_controller import GetWeightVisualizationsController
+from adapter.presenter.get_weight_visualizations_presenter import new_get_finetuning_job_visualization_presenter
+from usecase.get_weight_visualizations import GetFinetuningJobVisualizationInput, GetFinetuningJobVisualizationOutput, new_get_finetuning_job_visualization_interactor
+# ▲▲▲ 新規追加ここまで ▼▼▼
+
+# ▼▼▼ [新規追加] Image Stream 関連のインポート (プロキシ用) ★★★ ▼▼▼
+from adapter.controller.get_image_stream_controller import GetImageStreamController
+from adapter.presenter.get_image_stream_presenter import new_get_image_stream_presenter
+from usecase.get_image_stream import GetImageStreamInput, GetImageStreamOutput, new_get_image_stream_interactor
+# ▲▲▲ 新規追加ここまで ★★★ ▼▼▼
 
 
 # (Infrastructure / Domain Services)
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
 from infrastructure.database.mysql.agent_repository import MySQLAgentRepository 
-# ▼▼▼ [新規追加] Finetuning Job Repository をインポート ▼▼▼
 from infrastructure.database.mysql.finetuning_job_repository import MySQLFinetuningJobRepository
-# ▲▲▲ 新規追加ここまで ▲▲▲
+from infrastructure.database.mysql.weight_visualization_repository import MySQLWeightVisualizationRepository
 from infrastructure.database.mysql.config import NewMySQLConfigFromEnv
 from infrastructure.domain.services.auth_domain_service_impl import NewAuthDomainService
-# ▼▼▼ [新規追加] New Domain Service Impls をインポート ▼▼▼
 from infrastructure.domain.services.file_storage_domain_service_impl import NewFileStorageDomainService
 from infrastructure.domain.services.job_queue_domain_service_impl import NewJobQueueDomainService
 from infrastructure.domain.services.system_time_domain_service_impl import NewSystemTimeDomainService 
-# ▲▲▲ 新規追加ここまで ▲▲▲
+# ▼▼▼ [新規追加] Image Stream Service Impl をインポート ★★★ ▼▼▼
+from infrastructure.domain.services.get_image_stream_domain_service_impl import NewFileStreamDomainService
+# ▲▲▲ 新規追加ここまで ★★★ ▼▼▼
 
 
 # === Router Setup ===
@@ -68,9 +82,8 @@ router = APIRouter()
 db_config = NewMySQLConfigFromEnv()
 user_repo = MySQLUserRepository(db_config)
 agent_repo = MySQLAgentRepository(db_config) 
-# ▼▼▼ [新規追加] Finetuning Job Repository をインスタンス化 ▼▼▼
 finetuning_job_repo = MySQLFinetuningJobRepository(db_config) 
-# ▲▲▲ 新規追加ここまで ▲▲▲
+weight_visualization_repo = MySQLWeightVisualizationRepository(db_config)
 ctx_timeout = 10.0
 oauth2_scheme = HTTPBearer()
 
@@ -78,6 +91,7 @@ oauth2_scheme = HTTPBearer()
 file_storage_service = NewFileStorageDomainService()
 job_queue_service = NewJobQueueDomainService()
 system_time_service = NewSystemTimeDomainService() 
+file_stream_service = NewFileStreamDomainService() # ★画像ストリームサービスをインスタンス化 ★
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
 
@@ -86,11 +100,15 @@ def handle_response(response_dict: Dict, success_code: int = 200):
     status_code = response_dict.get("status", 500)
     data = response_dict.get("data")
 
+    # StreamingResponse の場合はそのまま返す
+    if isinstance(data, StreamingResponse):
+        return data
+        
     # DTOを辞書に変換
     if is_dataclass(data):
         data = asdict(data)
         
-        # ★★★ 修正: datetimeオブジェクトをISO文字列に変換 (エラー回避用) ★★★
+        # 修正: datetimeオブジェクトをISO文字列に変換
         def convert_datetime_to_str(obj):
             if isinstance(obj, datetime):
                 return obj.isoformat()
@@ -101,7 +119,6 @@ def handle_response(response_dict: Dict, success_code: int = 200):
             return obj
         
         data = convert_datetime_to_str(data)
-        # ★★★ 修正ここまで ★★★
 
     if status_code >= 400:
         return JSONResponse(content=data, status_code=status_code)
@@ -112,7 +129,7 @@ def handle_response(response_dict: Dict, success_code: int = 200):
     return JSONResponse(content=data, status_code=success_code)
 
 
-# === Request DTOs ===
+# === Request DTOs (中略) ===
 class CreateUserRequest(BaseModel):
     username: str
     name: str
@@ -133,13 +150,10 @@ class CreateAgentRequest(BaseModel):
 @router.post("/v1/auth/signup", response_model=CreateUserOutput)
 def create_user(request: CreateUserRequest):
     try:
-        # 組み立て
         repo = user_repo 
         presenter = new_auth_signup_presenter()
         usecase = new_create_user_interactor(presenter, repo, ctx_timeout)
         controller = CreateUserController(usecase)
-
-        # DTO 作成して実行
         input_data = CreateUserInput(**request.dict())
         response_dict = controller.execute(input_data)
         return handle_response(response_dict, success_code=201)
@@ -150,14 +164,11 @@ def create_user(request: CreateUserRequest):
 @router.post("/v1/auth/login", response_model=LoginUserOutput)
 def login_user(request: LoginUserRequest):
     try:
-        # 組み立て
         repo = user_repo 
         auth_service = NewAuthDomainService(repo)
         presenter = new_login_user_presenter()
         usecase = new_login_user_interactor(presenter, auth_service, ctx_timeout)
         controller = LoginUserController(usecase)
-
-        # DTO 作成して実行
         input_data = LoginUserInput(**request.dict())
         response_dict = controller.execute(input_data)
         return handle_response(response_dict, success_code=200)
@@ -169,22 +180,17 @@ def login_user(request: LoginUserRequest):
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
     try:
         token = credentials.credentials
-
-        # 組み立て
         repo = user_repo
         auth_service = NewAuthDomainService(repo)
         presenter = new_get_user_presenter()
         usecase = new_get_user_interactor(presenter, auth_service, ctx_timeout)
         controller = GetUserController(usecase)
-
-        # DTOを作成して実行
         input_data = GetUserInput(token=token)
         response_dict = controller.execute(input_data)
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
-# エージェント作成エンドポイント
 @router.post("/v1/agents", response_model=CreateAgentOutput)
 def create_agent(
     request: CreateAgentRequest,
@@ -192,14 +198,10 @@ def create_agent(
 ):
     try:
         token = credentials.credentials
-        
-        # 組み立て
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_create_agent_presenter()
         usecase = new_create_agent_interactor(presenter, agent_repo, auth_service, ctx_timeout)
         controller = CreateAgentController(usecase)
-
-        # DTOを作成して実行
         input_data = CreateAgentInput(
             token=token,
             name=request.name,
@@ -211,7 +213,6 @@ def create_agent(
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ユーザーのエージェント一覧取得エンドポイント
 @router.get("/v1/agents", response_model=GetUserAgentsOutput)
 def get_user_agents(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
     """
@@ -219,22 +220,17 @@ def get_user_agents(credentials: HTTPAuthorizationCredentials = Depends(oauth2_s
     """
     try:
         token = credentials.credentials
-        
-        # 組み立て
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_get_user_agents_presenter()
         usecase = new_get_user_agents_interactor(presenter, agent_repo, auth_service)
         controller = GetUserAgentsController(usecase)
-
-        # DTOを作成して実行
         response_dict = controller.execute(token=token) 
-        
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
 
-# ▼▼▼ [新規追加] ファインチューニングジョブ作成エンドポイント ▼▼▼
+# ▼▼▼ ファインチューニングジョブ作成エンドポイント ▼▼▼
 @router.post("/v1/agents/{agent_id}/finetuning", response_model=CreateFinetuningJobOutput)
 def create_finetuning_job(
     agent_id: int,
@@ -246,72 +242,89 @@ def create_finetuning_job(
     """
     try:
         token = credentials.credentials
-        
-        # 1. Adapterを使用してFastAPIのUploadFileをドメインの抽象型に変換
         domain_file_stream = FastAPIUploadedFileAdapter(training_file)
-
-        # 2. Input DTO を構築
         input_data = CreateFinetuningJobInput(
             token=token,
             agent_id=agent_id,
-            training_file=domain_file_stream # 抽象化されたファイルストリームを渡す
+            training_file=domain_file_stream
         )
-
-        # 3. 組み立て
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_create_finetuning_job_presenter()
-        
-        # NewFinetuningJobInteractorに時刻サービスをDI
         usecase = new_create_finetuning_job_interactor(
-            presenter=presenter,
-            job_repo=finetuning_job_repo,          
-            agent_repo=agent_repo,
-            auth_service=auth_service,
-            file_storage_service=file_storage_service, 
-            job_queue_service=job_queue_service,       
-            system_time_service=system_time_service, # ★ 時刻サービスを注入 ★
+            presenter=presenter, job_repo=finetuning_job_repo, agent_repo=agent_repo,
+            auth_service=auth_service, file_storage_service=file_storage_service, 
+            job_queue_service=job_queue_service, system_time_service=system_time_service, 
         )
         controller = CreateFinetuningJobController(usecase)
-
-        # 4. Controllerを実行 (Input DTOを引数として渡す形式)
-        response_dict = controller.execute(
-            input_data=input_data 
-        )
-        
-        # 5. 応答 (キューイングに成功したら 201 Created)
+        response_dict = controller.execute(input_data=input_data)
         return handle_response(response_dict, success_code=201)
-    
     except Exception as e:
         return JSONResponse({"error": f"An unexpected error occurred: {e}"}, status_code=500)
-# ▲▲▲ 新規追加ここまで ▲▲▲
+# ▲▲▲ ファインチューニングジョブ作成エンドポイント ▲▲▲
 
 
-# ▼▼▼ [新規追加] ユーザーのファインチューニングジョブ一覧取得エンドポイント ★★★ ▼▼▼
-@router.get("/v1/agents/{agent_id}/jobs", response_model=GetUserFinetuningJobsOutput)
+# ▼▼▼ ユーザーのファインチューニングジョブ一覧取得エンドポイント ▼▼▼
 @router.get("/v1/jobs", response_model=GetUserFinetuningJobsOutput)
 def get_user_finetuning_jobs(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
+    try:
+        token = credentials.credentials
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_get_user_finetuning_jobs_presenter()
+        usecase = new_get_user_finetuning_jobs_interactor(
+            presenter=presenter, job_repo=finetuning_job_repo, auth_service=auth_service,
+        )
+        controller = GetUserFinetuningJobsController(usecase)
+        response_dict = controller.execute(token=token)
+        return handle_response(response_dict, success_code=200)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+# ▲▲▲ ユーザーのファインチューニングジョブ一覧取得エンドポイント ▲▲▲
+
+
+# ▼▼▼ [新規追加] 重み可視化データ取得エンドポイント ★★★ ▼▼▼
+@router.get("/v1/jobs/{job_id}/visualizations", response_model=GetFinetuningJobVisualizationOutput)
+def get_job_visualizations(
+    job_id: int = Path(..., description="ID of the Finetuning Job"), 
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
     """
-    認証されたユーザーが所有する全てのエージェントのファインチューニングジョブ一覧を取得する。
+    特定のファインチューニングジョブIDに紐づく重み可視化データ (ヒートマップURLなど) を取得する。
     """
     try:
         token = credentials.credentials
-        
-        # 組み立て
+        input_data = GetFinetuningJobVisualizationInput(token=token, job_id=job_id)
         auth_service = NewAuthDomainService(user_repo)
-        presenter = new_get_user_finetuning_jobs_presenter()
-        
-        usecase = new_get_user_finetuning_jobs_interactor(
-            presenter=presenter,
-            job_repo=finetuning_job_repo,
-            auth_service=auth_service,
+        presenter = new_get_finetuning_job_visualization_presenter()
+        usecase = new_get_finetuning_job_visualization_interactor(
+            presenter=presenter, vis_repo=weight_visualization_repo, job_repo=finetuning_job_repo,
+            agent_repo=agent_repo, auth_service=auth_service,
         )
-        controller = GetUserFinetuningJobsController(usecase)
-
-        # Controllerを実行 (Input DTOを構築せずに直接トークンを渡す形式)
-        response_dict = controller.execute(token=token)
-        
+        controller = GetWeightVisualizationsController(usecase)
+        response_dict = controller.execute(token=token, job_id=job_id)
         return handle_response(response_dict, success_code=200)
-
     except Exception as e:
-        return JSONResponse({"error": str(e)}, status_code=500)
-# ▲▲▲ 新規追加ここまで ★★★ ▲▲▲
+        return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
+# ▲▲▲ 重み可視化データ取得エンドポイント ▲▲▲
+
+
+# ▼▼▼ [新規追加] 画像プロキシエンドポイント ★★★ ▼▼▼
+@router.get("/v1/visuals/{filepath:path}", response_class=StreamingResponse)
+async def serve_visualizations(filepath: str):
+    """
+    VPS上の可視化画像ファイルをSFTP経由で読み込み、ブラウザにストリーミング配信する。
+    filepathは 'job_ID/layer0/image.png' 形式を想定。
+    """
+    # 1. 組み立て
+    file_stream_service = NewFileStreamDomainService() # インスタンス化
+    presenter = new_get_image_stream_presenter()
+    usecase = new_get_image_stream_interactor(
+        presenter=presenter,
+        file_stream_service=file_stream_service,
+    )
+    controller = GetImageStreamController(usecase)
+
+    # 2. Controllerを実行
+    # Controllerの execute は StreamingResponse または JSONResponse を直接返す
+    # そのため、handle_response ヘルパーを使わずに直接返す
+    return controller.execute(relative_path=filepath)
+# ▲▲▲ 新規追加ここまで ★★★ ▼▼▼

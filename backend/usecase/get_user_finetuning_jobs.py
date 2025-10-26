@@ -38,7 +38,6 @@ class FinetuningJobListItem:
     agent_id: int
     status: str
     training_file_path: str
-    model_id: Optional[str]
     created_at: str # ISO 8601 string
     finished_at: Optional[str] # ISO 8601 string
     error_message: Optional[str]

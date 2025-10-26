@@ -1,22 +1,28 @@
 # AGENTHUB/worker/tasks/finetuning/finetuning_tasks.py
 
 from worker.celery_app import celery_app
-from . import executor # ロジックを実装する executor モジュールをインポート
+from . import executor # executor モジュールをインポート
 
 # タスク名: finetuning.submit_job
-@celery_app.task(bind=True, name='finetuning.submit_job')
-def submit_finetuning_job(self, job_id: str, file_path: str):
+@celery_app.task(bind=True, name='finetuning.submit_job', max_retries=1)
+# ★★★ base_model_name_short 引数を削除 ★★★
+def submit_finetuning_job(self, job_id: int, file_path: str):
     """
-    ユーザーリクエストに応じて、ファインチューニングジョブを開始するタスク。
-    長時間処理は executor に委譲する。
+    ファインチューニングジョブを開始するタスク。
+    executor.execute_finetuning_pipeline に処理を委譲する。
+    モデルは常に 'bert-tiny' を使用する。
     """
     try:
-        # executor に処理を委譲し、ジョブを実行・DBステータスを更新させる
-        executor.execute_finetuning_pipeline(job_id, file_path)
-        
+        print(f"INFO: Celery task received for job {job_id} (using default model 'bert-tiny')")
+        # executor に処理を委譲
+        executor.execute_finetuning_pipeline(
+            job_id=int(job_id),
+            training_file_path_on_vps=file_path
+            # ★★★ base_model_name_short は渡さない ★★★
+        )
+        print(f"INFO: Celery task for job {job_id} completed via executor.")
+
     except Exception as e:
-        # 処理中にエラーが発生した場合、タスクを失敗としてマーク
-        print(f"Fine-tuning job {job_id} failed: {e}")
-        # executor や repository 経由で DB のステータスを 'failed' に更新するロジックをここに実装
-        # 例: executor.update_job_status(job_id, 'failed', error=str(e))
-        raise # Celeryにタスクの失敗を通知
+        print(f"ERROR: Celery task for job {job_id} failed critically: {e}")
+        # executor の finally ブロックで DB 更新されるはず
+        raise self.retry(exc=e, countdown=60) if self.request.retries < self.max_retries else e

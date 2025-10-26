@@ -6,8 +6,7 @@
     "error_message": null,
     "status": "completed",
     "created_at": "2024-10-01T10:00:00Z",
-    "finished_at": "2024-10-01T12:30:00Z",
-    "model_id": "model_abc_v2"
+    "finished_at": "2024-10-01T12:30:00Z"
   },
   {
     "id": "job_002",
@@ -16,8 +15,7 @@
     "error_message": null,
     "status": "running",
     "created_at": "2024-10-05T14:00:00Z",
-    "finished_at": null,
-    "model_id": "model_abc_v3_inprogress"
+    "finished_at": null
   },
   {
     "id": "job_003",
@@ -26,7 +24,6 @@
     "error_message": "Failed due to network timeout during training.",
     "status": "failed",
     "created_at": "2024-10-08T09:15:00Z",
-    "finished_at": "2024-10-08T09:45:00Z",
-    "model_id": null
+    "finished_at": "2024-10-08T09:45:00Z"
   }
 ]

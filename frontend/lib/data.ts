@@ -48,21 +48,24 @@ export type TrainingLink = {
   file_size: string | null;
 };
 
-// 重み可視化データの重み部分の型定義
-export type WeightVisualization = {
+// ★★★ 修正箇所: 重み可視化データの重み部分の型定義 ★★★
+// バックエンドの DTO (WeightVisualizationDetail) に合わせてプロパティ名を修正します
+export type WeightVisualizationDetail = {
   name: string;
-  before: string;
-  after: string;
-  delta: string;
+  before_url: string; // before -> before_url に修正
+  after_url: string;   // after -> after_url に修正
+  delta_url: string;   // delta -> delta_url に修正
 };
 
 // 重み可視化データのレイヤー部分の型定義
+// ★★★ 修正箇所: 内部の型名を修正 ★★★
 export type WeightLayer = {
   layer_name: string;
-  weights: WeightVisualization[];
+  weights: WeightVisualizationDetail[]; // WeightVisualization -> WeightVisualizationDetail に修正
 };
 
 // ジョブに紐づく重み可視化データ全体の型定義
+// ★★★ 修正箇所: 内部の型名を修正 ★★★
 export type Visualizations = {
   job_id: string;
   layers: WeightLayer[];
