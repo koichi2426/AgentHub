@@ -2,7 +2,7 @@
 """
 train_and_export.py
 
-ファインチューニング、ONNXエクスポート、INT8量子化を行うスクリプト。
+ファインチューニング、ONNXエクスポート、INT8量子化、GGUFエクスポートを行うスクリプト。
 ワーカーの実行環境で非対話的に使用される。
 """
 
@@ -17,6 +17,7 @@ from onnxruntime.quantization import quantize_static, CalibrationDataReader, Qua
 import numpy as np
 from tqdm import tqdm
 import sys # 終了処理用
+import subprocess # 🚨 GGUFエクスポートのために追加
 
 # ==========================
 # 共通設定 (引数で上書きされない限りこの値を使用)
@@ -204,13 +205,74 @@ def quantize_model(tokenizer, onnx_fp32: str, output_dir: str):
 
 
 # ==========================
+# GGUFエクスポート (🚨 新規追加セクション)
+# ==========================
+def export_gguf(output_dir: str):
+    print("\n[5] Exporting GGUF (for bert.cpp/llama.cpp)...")
+    
+    # GGUF変換スクリプト(convert-to-ggml.pyなど)のパスを環境変数から取得
+    # Dockerfileで GGUF_CONVERT_SCRIPT=/app/bert.cpp/models/convert-to-ggml.py のように設定されていることを期待
+    convert_script_path = os.environ.get("GGUF_CONVERT_SCRIPT")
+    
+    if not convert_script_path or not os.path.exists(convert_script_path):
+        print(f"  ⚠️ WARNING: GGUF_CONVERT_SCRIPT environment variable not set or path invalid. Skipping GGUF export.")
+        print(f"  (Path checked: {convert_script_path})")
+        print("\n🎯 All training and ONNX export processes completed (GGUF skipped).")
+        return # GGUF以外は成功として終了
+
+    # bert.cpp/models/convert-to-ggml.py の命名規則に合わせる
+    gguf_output_path = os.path.join(output_dir, f"ggml-model-f16.gguf") 
+    
+    # 🚨 修正: 変換コマンドの引数の順序をエラーログに基づき変更
+    # 呼び出し形式: python convert-to-ggml.py <model_dir> <ftype_int> <output_file>
+    # ftype_int: 0=f32, 1=f16 (と想定)
+    cmd = [
+        sys.executable,         # 現在のPythonインタープリタ
+        convert_script_path,
+        output_dir,             # sys.argv[1]: ファインチューニング済みモデルが保存されたディレクトリ
+        "1",                    # sys.argv[2]: 出力タイプ (1 = f16 と想定)
+        gguf_output_path        # sys.argv[3]: 出力ファイルパス
+    ]
+    
+    print(f"  Running GGUF conversion command: {' '.join(cmd)}")
+    
+    try:
+        # サブプロセスの標準出力とエラーをリアルタイムで表示しつつ実行
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+        
+        if process.stdout:
+            for line in iter(process.stdout.readline, ''):
+                print(f"  [GGUF]: {line.strip()}", flush=True)
+            process.stdout.close()
+        
+        return_code = process.wait()
+        
+        if return_code != 0:
+            raise subprocess.CalledProcessError(return_code, cmd)
+            
+        print(f"✅ GGUF export complete → {gguf_output_path}")
+        print("\n🎯 All training and export processes completed (including GGUF).")
+        
+    except subprocess.CalledProcessError as e:
+        print(f"  ❌ ERROR: GGUF conversion failed with return code {e.returncode}.", file=sys.stderr)
+        print("\n🎯 Training and ONNX export completed (GGUF FAILED).")
+        # GGUF変換が失敗しても、ONNXは成功しているので、ここでは処理を停止しない
+        
+    except Exception as e:
+        print(f"  ❌ ERROR: An unexpected error occurred during GGUF conversion: {e}", file=sys.stderr)
+        print("\n🎯 Training and ONNX export completed (GGUF FAILED).")
+
+
+# ==========================
 # メイン処理 (非対話型)
 # ==========================
 def main():
     parser = argparse.ArgumentParser(description="Fine-tuning and model export script for TinyBERT models.")
+    # 🚨 修正: .add.argument を .add_argument に修正
     parser.add_argument("--base_model_path", required=True, help="Local path to the base model directory (e.g., /app/worker/.../bert-tiny).")
     parser.add_argument("--training_file", required=True, help="Local path to the training data file (e.g., /tmp/job_ID/data/train_triplets.txt).")
     parser.add_argument("--output_dir", required=True, help="Directory to save the fine-tuned model and exports.")
+    # 🚨 修正: 抜けていた --epochs と --lr の引数を追加
     parser.add_argument("--epochs", type=int, default=EPOCHS, help=f"Number of training epochs (default: {EPOCHS}).")
     parser.add_argument("--lr", type=float, default=LR, help=f"Learning rate (default: {LR}).")
 
@@ -236,7 +298,8 @@ def main():
     onnx_fp32 = export_onnx(model, tokenizer, args.output_dir)
     quantize_model(tokenizer, onnx_fp32, args.output_dir)
 
-    print("\n🎯 All training and export processes completed.")
+    # --- GGUFエクスポート (🚨 編集箇所) ---
+    export_gguf(args.output_dir)
 
 
 if __name__ == "__main__":
@@ -245,3 +308,4 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\nFATAL: Training pipeline failed: {e}", file=sys.stderr)
         sys.exit(1) # ワーカーに失敗を通知
+
