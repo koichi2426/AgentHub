@@ -2,7 +2,7 @@
 """
 train_and_export.py
 
-ファインチューニング、ONNXエクスポート、INT8量子化を行うスクリプト。
+ファインチューニング、ONNXエクスポート、INT8量子化、GGUFエクスポートを行うスクリプト。
 ワーカーの実行環境で非対話的に使用される。
 """
 
@@ -17,6 +17,7 @@ from onnxruntime.quantization import quantize_static, CalibrationDataReader, Qua
 import numpy as np
 from tqdm import tqdm
 import sys # 終了処理用
+import subprocess # 🚨 GGUFエクスポートのために追加
 
 # ==========================
 # 共通設定 (引数で上書きされない限りこの値を使用)
@@ -204,6 +205,63 @@ def quantize_model(tokenizer, onnx_fp32: str, output_dir: str):
 
 
 # ==========================
+# GGUFエクスポート (🚨 新規追加)
+# ==========================
+def export_gguf(output_dir: str):
+    print("\n[5] Exporting GGUF (for bert.cpp/llama.cpp)...")
+    
+    # GGUF変換スクリプト(convert.pyなど)のパスを環境変数から取得
+    # ワーカー環境で GGUF_CONVERT_SCRIPT=/path/to/llama.cpp/convert.py のように設定されていることを期待
+    convert_script_path = os.environ.get("GGUF_CONVERT_SCRIPT")
+    
+    if not convert_script_path or not os.path.exists(convert_script_path):
+        print(f"  ⚠️ WARNING: GGUF_CONVERT_SCRIPT environment variable not set or path invalid. Skipping GGUF export.")
+        print(f"  (Path checked: {convert_script_path})")
+        print("\n🎯 All training and ONNX export processes completed (GGUF skipped).")
+        return # GGUF以外は成功として終了
+
+    gguf_output_path = os.path.join(output_dir, "model.gguf")
+    
+    # 変換コマンド (HuggingFaceモデルディレクトリを GGUF (FP16) に変換)
+    cmd = [
+        sys.executable,         # 現在のPythonインタープリタ
+        convert_script_path,
+        output_dir,             # ファインチューニング済みモデルが保存されたディレクトリ
+        "--outfile",
+        gguf_output_path,
+        "--outtype", "f16"      # FP16形式で保存
+    ]
+    
+    print(f"  Running GGUF conversion command: {' '.join(cmd)}")
+    
+    try:
+        # サブプロセスの標準出力とエラーをリアルタイムで表示しつつ実行
+        process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8')
+        
+        if process.stdout:
+            for line in iter(process.stdout.readline, ''):
+                print(f"  [GGUF]: {line.strip()}", flush=True)
+            process.stdout.close()
+        
+        return_code = process.wait()
+        
+        if return_code != 0:
+            raise subprocess.CalledProcessError(return_code, cmd)
+            
+        print(f"✅ GGUF export complete → {gguf_output_path}")
+        print("\n🎯 All training and export processes completed (including GGUF).")
+        
+    except subprocess.CalledProcessError as e:
+        print(f"  ❌ ERROR: GGUF conversion failed with return code {e.returncode}.", file=sys.stderr)
+        print("\n🎯 Training and ONNX export completed (GGUF FAILED).")
+        # GGUF変換が失敗しても、ONNXは成功しているので、ここでは処理を停止しない
+        
+    except Exception as e:
+        print(f"  ❌ ERROR: An unexpected error occurred during GGUF conversion: {e}", file=sys.stderr)
+        print("\n🎯 Training and ONNX export completed (GGUF FAILED).")
+
+
+# ==========================
 # メイン処理 (非対話型)
 # ==========================
 def main():
@@ -236,7 +294,8 @@ def main():
     onnx_fp32 = export_onnx(model, tokenizer, args.output_dir)
     quantize_model(tokenizer, onnx_fp32, args.output_dir)
 
-    print("\n🎯 All training and export processes completed.")
+    # --- GGUFエクスポート (🚨 編集箇所) ---
+    export_gguf(args.output_dir)
 
 
 if __name__ == "__main__":
