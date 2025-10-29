@@ -166,7 +166,7 @@ def export_onnx(model, tokenizer, output_dir: str, max_length: int):
         input_names=["input_ids", "attention_mask"],
         output_names=["last_hidden_state"],
         dynamic_axes={"input_ids": {0: "batch"}, "attention_mask": {0: "batch"}},
-        opset_version=14 # 修正済み
+        opset_version=14 # 🚨 ここを14に修正済み
     )
     print(f"✅ ONNX FP32 output complete → {onnx_fp32}")
     return onnx_fp32
@@ -225,29 +225,26 @@ def quantize_model(calib_data_batch, onnx_fp32: str, output_dir: str):
 def export_gguf(output_dir: str):
     print("\n[5] Exporting GGUF (using llama.cpp conversion tools)...")
     
-    # 1. パス解決: 環境変数またはフォールバックパスを使用
-    # 環境変数から取得
+    LLAMA_CPP_BASE = "/app/llama.cpp"
+    LLAMA_CPP_BIN_DIR = os.path.join(LLAMA_CPP_BASE, "build/bin")
+
+    # 1. パス解決: 環境変数から取得、またはフォールバックパスを試す
     convert_script_path = os.environ.get("GGUF_CONVERT_SCRIPT")
     quantize_script_path = os.environ.get("GGUF_QUANTIZE_SCRIPT")
 
-    # 🚨 修正: 環境変数で取得できなかった場合、フォールバックパスで上書きするロジック
-    if not os.path.exists(convert_script_path) or not os.path.exists(quantize_script_path):
-        LLAMA_CPP_BASE = "/app/llama.cpp"
-        # 環境変数がない、またはパスが存在しない場合、既知のクローンパスを試す
+    # 🚨 修正: convert_hf_to_gguf.pyのパスを確定
+    if not convert_script_path or not os.path.exists(convert_script_path):
         convert_script_path = os.path.join(LLAMA_CPP_BASE, "convert_hf_to_gguf.py")
-        quantize_script_path = os.path.join(LLAMA_CPP_BASE, "build/bin/quantize") 
+        
+        if not os.path.exists(convert_script_path):
+            print(f"  ❌ ERROR: Conversion script not found. Skipping GGUF export.")
+            print(f"  (Checked path: {convert_script_path})")
+            print("---")
+            return
 
-    
-    if not os.path.exists(convert_script_path):
-        print(f"  ❌ ERROR: Conversion script not found. Skipping GGUF export.")
-        print(f"  (Checked path: {convert_script_path})")
-        print("---")
-        return
-
-    # 1. F16 (Full Precision) への変換 (llama.cpp/convert-hf-to-gguf.pyを使用)
+    # 1.1. F16 (Full Precision) への変換 (convert_hf_to_gguf.pyを使用)
     gguf_f16_path = os.path.join(output_dir, "ggml-model-f16.gguf")
     
-    # 呼び出し形式: python convert-hf-to-gguf.py <model_dir> --outfile <output_file> --outtype f16
     cmd_f16 = [
         sys.executable,
         convert_script_path,
@@ -260,31 +257,44 @@ def export_gguf(output_dir: str):
     
     try:
         # F16変換を実行
-        # capture_output=Falseにして、リアルタイムで出力が見えるようにする (デバッグ用途)
-        subprocess.run(cmd_f16, check=True, text=True, encoding='utf-8')
+        subprocess.run(cmd_f16, check=True, capture_output=True, text=True, encoding='utf-8')
         print(f"  ✅ F16 GGUF export complete → {gguf_f16_path}")
         
     except subprocess.CalledProcessError as e:
-        # エラーメッセージをログに出力
-        stderr_output = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else e.stderr
         print(f"  ❌ ERROR: F16 GGUF conversion failed with return code {e.returncode}.", file=sys.stderr)
-        print(f"  --- Stderr ---\n{stderr_output}", file=sys.stderr)
+        print(f"  --- Stderr ---\n{e.stderr}")
         print("---")
         return
 
 
     # 2. Q4_0 (4-bit quantization) への量子化 (llama.cpp/quantizeバイナリを使用)
-    if not os.path.exists(quantize_script_path):
-        print("  ⚠️ WARNING: GGUF quantize binary not found. Skipping 4-bit quantization.")
-        print(f"  (Checked path: {quantize_script_path})")
-        print("\n🎯 All training and export processes completed (GGUF Q4_0 skipped).")
-        return
+    # 2.1. quantizeバイナリのパスを確定 (llama-quantizeを優先)
+    if not quantize_script_path or not os.path.exists(quantize_script_path):
+        # 確定した正しい名前である 'llama-quantize' を優先して試す
+        correct_name_path = os.path.join(LLAMA_CPP_BIN_DIR, "llama-quantize")
         
+        if os.path.exists(correct_name_path):
+            quantize_script_path = correct_name_path
+            print(f"  ✅ SUCCESS: Quantize binary path confirmed: {quantize_script_path}")
+        else:
+            # 最後の手段: ワイルドカード検索
+            found_quantize_binaries = glob.glob(os.path.join(LLAMA_CPP_BIN_DIR, "*quantize*"))
+            
+            if found_quantize_binaries:
+                quantize_script_path = found_quantize_binaries[0]
+                print(f"  ✅ SUCCESS: Found quantize binary via search: {quantize_script_path}")
+            else:
+                print("  ❌ ERROR: GGUF quantize binary not found. Skipping 4-bit quantization.", file=sys.stderr)
+                print(f"  (Checked dir: {LLAMA_CPP_BIN_DIR})")
+                print("\n🎯 All training and export processes completed (GGUF Q4_0 skipped).")
+                return
+
+
+    # 2.2. 量子化の実行
     gguf_q4_path = os.path.join(output_dir, "ggml-model-q4_0.gguf") 
     
-    # 呼び出し形式: ./quantize <input.gguf> <output.gguf> <quant_type>
     cmd_q4 = [
-        quantize_script_path,
+        quantize_script_path,   # 確定した正しいパス
         gguf_f16_path,          # 入力ファイル (F16モデル)
         gguf_q4_path,           # 出力ファイル (Q4_0モデル)
         "Q4_0"                  # 量子化タイプ
@@ -294,15 +304,12 @@ def export_gguf(output_dir: str):
     
     try:
         # Q4_0量子化を実行
-        # capture_output=Falseにして、リアルタイムで出力が見えるようにする
-        subprocess.run(cmd_q4, check=True, text=True, encoding='utf-8')
+        subprocess.run(cmd_q4, check=True, capture_output=True, text=True, encoding='utf-8')
         print(f"  ✅ Q4_0 GGUF export complete → {gguf_q4_path}")
         
     except subprocess.CalledProcessError as e:
-        # エラーメッセージをログに出力
-        stderr_output = e.stderr.decode('utf-8') if isinstance(e.stderr, bytes) else e.stderr
         print(f"  ❌ ERROR: Q4_0 GGUF quantization failed with return code {e.returncode}.", file=sys.stderr)
-        print(f"  --- Stderr ---\n{stderr_output}", file=sys.stderr)
+        print(f"  --- Stderr ---\n{e.stderr}")
         print("\n🎯 Training and ONNX export completed (GGUF Q4_0 FAILED).")
         return
         
