@@ -1,17 +1,14 @@
 [
   {
     "id": "dep_001",
-    "modelId": "model_dataanalyzerpro_v1_base",
+    "job_id": "job_001", 
     "status": "active",
-    "endpoint": "https://api.agenthub.dev/koichi/dataanalyzer-pro/v1",
-    "createdAt": "2024-09-20T18:00:00Z"
+    "endpoint": "https://api.agenthub.dev/koichi/dataanalyzer-pro/v1"
   },
   {
     "id": "dep_002",
-    "modelId": "model_abc_v2",
+    "job_id": "job_002",
     "status": "inactive",
-    "endpoint": "https://api.agenthub.dev/koichi/dataanalyzer-pro/v2",
-    "createdAt": "2024-10-01T13:00:00Z"
+    "endpoint": "https://api.agenthub.dev/koichi/dataanalyzer-pro/v2"
   }
 ]
-

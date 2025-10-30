@@ -42,7 +42,7 @@ export default function AgentTabDeployments({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Model ID</TableHead>
+              <TableHead>Job ID</TableHead> 
               <TableHead>Status</TableHead>
               <TableHead>Endpoint</TableHead>
             </TableRow>
@@ -53,13 +53,11 @@ export default function AgentTabDeployments({
                 key={dep.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"
                 onClick={() =>
-                  // ルーティングも新しいmodel_id/created_at形式を使用する可能性を考慮し、修正が必要な場合あり。
-                  // ここではデプロイメントIDを使用する前提を維持。
                   router.push(`/${username}/${agentname}/deployments/${dep.id}`)
                 }
               >
                 <TableCell className="font-mono font-medium text-primary">
-                  {dep.model_id} {/* ✅ 修正: modelId -> model_id */}
+                  {dep.job_id} 
                 </TableCell>
                 <TableCell>
                   <Badge

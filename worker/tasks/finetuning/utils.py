@@ -4,7 +4,51 @@ import os
 import subprocess
 import re
 import json
+import sys
 from typing import Optional, List, Dict, Any
+
+# =========================================================================
+# メソッド抽出関数 (修正済み)
+# =========================================================================
+
+def extract_methods_from_training_file(training_file_path: str, output_txt_path: str) -> None:
+    """
+    訓練データファイルからユニークなメソッド名を抽出し、指定されたパスにテキストファイルとして保存する。
+    訓練データはタブ区切りの4列（Anchor, Positive, Negative, (Optional Field)）と仮定し、
+    Positive (インデックス1) と Negative (インデックス2) のみをメソッドとして抽出する。
+    """
+    unique_methods = set()
+    try:
+        with open(training_file_path, 'r', encoding='utf-8') as f:
+            for line in f:
+                # 行頭・行末の空白を削除し、タブで分割
+                parts = line.strip().split('\t')
+                
+                # parts内の各要素をメソッドとして追加
+                # 修正: 2列目 (インデックス1) と 3列目 (インデックス2) のみを確認
+                if len(parts) > 1 and parts[1]:
+                    unique_methods.add(parts[1].strip())
+                if len(parts) > 2 and parts[2]:
+                    unique_methods.add(parts[2].strip())
+
+        # 抽出したメソッドをファイルに書き込む
+        with open(output_txt_path, 'w', encoding='utf-8') as out_f:
+            for method in sorted(list(unique_methods)):
+                out_f.write(method + '\n')
+                
+        print(f"INFO: Extracted {len(unique_methods)} unique methods to {output_txt_path}")
+
+    except FileNotFoundError:
+        print(f"ERROR: Training file not found at {training_file_path}. Skipping method extraction.", file=sys.stderr)
+        raise FileNotFoundError(f"Training file not found for method extraction: {training_file_path}")
+    except Exception as e:
+        print(f"ERROR: Failed during method extraction: {e}", file=sys.stderr)
+        raise RuntimeError(f"Method extraction failed: {e}")
+
+
+# =========================================================================
+# 可視化パス解析関数 (既存)
+# =========================================================================
 
 def parse_visualization_output(uploaded_image_paths: Dict[str, str], job_id: int) -> List[Dict[str, Any]]:
     """
@@ -61,6 +105,11 @@ def parse_visualization_output(uploaded_image_paths: Dict[str, str], job_id: int
 
     print(f"DEBUG: Job {job_id}: Parsed layers data: {json.dumps(final_layers_data, indent=2)}") # Debug output
     return final_layers_data
+
+
+# =========================================================================
+# スクリプト実行関数 (既存)
+# =========================================================================
 
 def run_script(job_id: int, script_path: str, args: List[str], cwd: str) -> bool:
     """外部Pythonスクリプトを実行し、成否を返す。失敗時はRuntimeErrorを送出。"""

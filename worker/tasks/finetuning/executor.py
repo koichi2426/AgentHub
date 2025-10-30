@@ -11,7 +11,8 @@ from typing import Optional, List, Dict, Any
 try:
     from .sftp_service import create_sftp_service_from_env, SFTPFileStorageService, FileStorageError
     from .db_helpers import find_job_by_id, update_job_status, save_visualization, JobInfo
-    from .utils import parse_visualization_output, run_script
+    # 修正: utils から extract_methods_from_training_file をインポート
+    from .utils import parse_visualization_output, run_script, extract_methods_from_training_file
 except ImportError as e:
     print(f"FATAL: Failed to import sibling modules: {e}")
     raise
@@ -40,6 +41,10 @@ def execute_finetuning_pipeline(
     temp_model_dir = os.path.join(temp_job_dir, "model")
     temp_visuals_dir = os.path.join(temp_job_dir, "visuals")
     local_training_file_path = os.path.join(temp_data_dir, os.path.basename(training_file_path_on_vps))
+    
+    # ★★★ 新規: ローカルメソッドファイルパス定義 ★★★
+    local_methods_file_path = os.path.join(temp_model_dir, "methods.txt")
+    
     train_script_path = os.path.join(worker_base_dir, "tasks", "finetuning", "train_and_export.py")
     visualize_script_path = os.path.join(worker_base_dir, "tasks", "finetuning", "visualize_finetuning_diff.py")
 
@@ -86,6 +91,11 @@ def execute_finetuning_pipeline(
         sftp_service.download_file(training_file_path_on_vps, local_training_file_path)
         print(f"INFO: Job {job_id}: Training file downloaded.")
 
+        # ★★★ 2.5. Extract Methods from Training File ★★★
+        print(f"INFO: Job {job_id}: Extracting methods...")
+        extract_methods_from_training_file(local_training_file_path, local_methods_file_path)
+        print(f"INFO: Job {job_id}: Method extraction complete.")
+        
         # --- 3. Run Training Script ---
         print(f"INFO: Job {job_id}: Starting training script...")
         train_args = [
@@ -99,8 +109,8 @@ def execute_finetuning_pipeline(
         # --- 4. Process Results ---
         print(f"INFO: Job {job_id}: Processing successful training results...")
 
-        # 4a. Upload Model
-        print(f"INFO: Job {job_id}: Uploading model artifacts...")
+        # 4a. Upload Model (methods.txtもtemp_model_dirにあるため、一緒にアップロードされる)
+        print(f"INFO: Job {job_id}: Uploading model artifacts (including methods.txt)...")
         sftp_service.upload_directory(temp_model_dir, remote_model_base_dir)
         print(f"INFO: Job {job_id}: Model artifacts uploaded.")
 

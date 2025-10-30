@@ -41,15 +41,12 @@ export default function DeploymentDetailPage({
     const foundUser = (users as User[]).find((u) => u.name.toLowerCase() === lowerUsername);
     const foundAgent = (agents as Agent[]).find((a) => a.owner.toLowerCase() === lowerUsername && a.name.toLowerCase() === lowerAgentname);
     
-    // NOTE: Deployment型のフィールド名はスネークケースに修正済みと仮定
     const foundDeployment = (rawDeployments as unknown as Deployment[]).find((d) => d.id === deploymentid);
     
-    // ★★★ 修正1: メソッドデータを検索 (インポートした DeploymentMethodsEntry を使用) ★★★
     const allMethods = rawMethods as DeploymentMethodsEntry[];
     const methodEntry = allMethods.find((m) => m.deploymentId === deploymentid);
     
     const methodList = methodEntry ? methodEntry.methods : [];
-
 
     return { user: foundUser, agent: foundAgent, deployment: foundDeployment, methods: methodList };
   }, [username, agentname, deploymentid]);
@@ -68,7 +65,6 @@ export default function DeploymentDetailPage({
     <div className="container mx-auto max-w-4xl p-6">
       <DeploymentBreadcrumb user={user} agent={agent} deploymentId={deployment.id} />
       
-      {/* ★★★ レイアウトとメソッドカードの描画 ★★★ */}
       <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <DeploymentDetailCard deployment={deployment} />
