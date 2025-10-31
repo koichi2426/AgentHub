@@ -72,9 +72,9 @@ services:
       # Set defaults for optional vars
       VPS_PORT: ${VPS_PORT:-22}
       # --- ▼▼▼ 修正点: デフォルトパスを Windows (satoy機) 用に変更 ▼▼▼ ---
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/C/Users/${VPS_USER}/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/C/Users/${VPS_USER}/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/C/Users/${VPS_USER}/visualizations}
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/Users/${VPS_USER}/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/Users/${VPS_USER}/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/Users/${VPS_USER}/visualizations}
       # --- ▲▲▲ 修正完了 ▲▲▲ ---
     restart: unless-stopped
 
@@ -119,9 +119,9 @@ services:
       # Set defaults for optional vars
       VPS_PORT: ${VPS_PORT:-22}
       # --- ▼▼▼ 修正点: デフォルトパスを Windows (satoy機) 用に変更 ▼▼▼ ---
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/C/Users/${VPS_USER}/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/C/Users/${VPS_USER}/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/C/Users/${VPS_USER}/visualizations}
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/Users/${VPS_USER}/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/Users/${VPS_USER}/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/Users/${VPS_USER}/visualizations}
       # --- ▲▲▲ 修正完了 ▲▲▲ ---
     restart: unless-stopped
     
