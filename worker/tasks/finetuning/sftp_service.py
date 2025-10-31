@@ -5,6 +5,9 @@ import paramiko
 import stat
 from typing import Optional, Dict, Any
 from contextlib import contextmanager
+# --- ▼▼▼ 修正点 1: 必要な鍵クラスをインポート ▼▼▼ ---
+from paramiko.ed25519key import Ed25519Key
+# --- ▲▲▲ 修正点 1 完了 ▲▲▲ ---
 
 # Define Error class locally
 class FileStorageError(Exception):
@@ -13,26 +16,33 @@ class FileStorageError(Exception):
 
 class SFTPFileStorageService:
     """Paramiko (SFTP) を使用して、リモートVPSとのファイル操作を行うサービス。"""
-    def __init__(self, vps_ip: str, vps_user: str, vps_account_password: str,
+    
+    # --- ▼▼▼ 修正点 2: 不要なパスワード引数を __init__ から削除 ▼▼▼ ---
+    def __init__(self, vps_ip: str, vps_user: str,
                  key_file_path: str, remote_training_dir: str,
                  remote_model_dir: str, remote_visuals_dir: str,
                  vps_port: int = 22):
 
         self.vps_ip = vps_ip
         self.vps_user = vps_user
-        self.vps_account_password = vps_account_password
+        # self.vps_account_password = vps_account_password # ← 削除
         self.vps_port = vps_port
         self.key_file_path = key_file_path
         self.remote_training_base_dir = remote_training_dir
         self.remote_model_base_dir = remote_model_dir
         self.remote_visuals_base_dir = remote_visuals_dir
+    # --- ▲▲▲ 修正点 2 完了 ▲▲▲ ---
 
         if not os.path.exists(self.key_file_path):
             raise FileNotFoundError(f"SSH key file not found: {self.key_file_path}")
+        
+        # --- ▼▼▼ 修正点 3: RSAKey を Ed25519Key に変更 ▼▼▼ ---
         try:
-            self.private_key = paramiko.RSAKey(filename=self.key_file_path)
+            # self.private_key = paramiko.RSAKey(filename=self.key_file_path) # ← 古い
+            self.private_key = paramiko.Ed25519Key(filename=self.key_file_path) # ← 新しい鍵
         except Exception as e:
-            raise FileStorageError(f"Failed to load SSH private key: {e}")
+            raise FileStorageError(f"Failed to load SSH private key (tried Ed25519): {e}")
+        # --- ▲▲▲ 修正点 3 完了 ▲▲▲ ---
 
         print(f"INFO: SFTP Storage Service initialized for {self.vps_user}@{self.vps_ip}")
 
@@ -44,13 +54,18 @@ class SFTPFileStorageService:
         try:
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            # print(f"DEBUG: Connecting SFTP...") # Reduced logging
+            
+            # --- ▼▼▼ 修正点 4: connect() から password 引数を削除 ▼▼▼ ---
             client.connect(
-                self.vps_ip, port=self.vps_port, username=self.vps_user,
-                password=self.vps_account_password, pkey=self.private_key
+                self.vps_ip, 
+                port=self.vps_port, 
+                username=self.vps_user,
+                # password=self.vps_account_password, # ← パスワード認証は無効なので削除
+                pkey=self.private_key
             )
+            # --- ▲▲▲ 修正点 4 完了 ▲▲▲ ---
+
             sftp = client.open_sftp()
-            # print(f"DEBUG: SFTP connected.") # Reduced logging
             yield sftp
         except Exception as e:
             print(f"ERROR: SFTP connection/operation failed: {e}")
@@ -62,10 +77,10 @@ class SFTPFileStorageService:
             if client:
                 try: client.close()
                 except Exception: pass # Ignore close errors
-            # print("DEBUG: SFTP Connection closed.") # Reduced logging
 
     def _ensure_remote_dir_internal(self, sftp: paramiko.SFTPClient, remote_dir: str):
         """リモートディレクトリが存在することを確認し、なければ再帰的に作成"""
+        # (この関数はWindows/Linuxパスを両方扱えるように作られているため、修正不要)
         current_dir = ""
         if not remote_dir.startswith('/'): raise ValueError("Remote path must be absolute")
         parts = remote_dir.strip('/').split('/')
@@ -80,7 +95,6 @@ class SFTPFileStorageService:
                 if not stat.S_ISDIR(sftp_attrs.st_mode):
                     raise FileStorageError(f"Path exists but is not directory: {current_dir}")
             except FileNotFoundError:
-                # print(f"DEBUG: Creating remote directory: {current_dir}") # Reduced logging
                 try:
                     sftp.mkdir(current_dir)
                 except Exception as mkdir_e:
@@ -111,7 +125,6 @@ class SFTPFileStorageService:
                 for filename in files:
                     local_file = os.path.join(root, filename)
                     remote_file = os.path.join(remote_current_dir, filename).replace("\\", "/")
-                    # print(f"DEBUG:   Uploading {local_file} -> {remote_file}") # Reduced logging
                     sftp.put(local_file, remote_file)
                     if return_remote_paths:
                         local_relative = os.path.relpath(local_file, local_dir_path).replace("\\", "/")
@@ -123,20 +136,35 @@ def create_sftp_service_from_env() -> SFTPFileStorageService:
     """環境変数からSFTPサービスインスタンスを生成"""
     print("INFO: Initializing SFTPFileStorageService from env...")
     try:
-        # 環境変数読み込み (必須項目がない場合は KeyError)
-        vps_ip=os.environ["VPS_IP"]; vps_user=os.environ["VPS_USER"]
-        vps_account_password=os.environ["VPS_ACCOUNT_PASSWORD"]
-        key_file_path=os.environ["VPS_KEY_FILE_PATH"]
-        vps_port=int(os.environ.get("VPS_PORT", 22))
-        remote_training_dir=os.environ.get("VPS_TRAINING_DIR", f"/home/{vps_user}/training_data")
-        remote_model_dir=os.environ.get("VPS_MODEL_DIR", f"/home/{vps_user}/models")
-        remote_visuals_dir=os.environ.get("VPS_VISUALS_DIR", f"/home/{vps_user}/visualizations") # Visuals dir from env
+        # 環境変数読み込み
+        vps_ip=os.environ["VPS_IP"]
+        vps_user=os.environ["VPS_USER"]
+        
+        # --- ▼▼▼ 修正点 5: 不要なパスワード読み込みを削除 ▼▼▼ ---
+        # vps_account_password=os.environ["VPS_ACCOUNT_PASSWORD"] # ← 削除
+        # --- ▲▲▲ 修正点 5 完了 ▲▲▲ ---
+        
+        key_file_path=os.environ["VPS_KEY_FILE_PATH"] # .env で /run/secrets/vps_key_ed25519 などを指定
+        vps_port=int(os.environ.get("VPS_PORT", 22)) # .env で 1720 などを指定
+        
+        # --- ▼▼▼ 修正点 6: 接続先はWindows (satoy機) なので、デフォルトパスをWindows形式に変更 ▼▼▼ ---
+        # (OpenSSH/paramikoは / を C:/ のように認識してくれるのでこれでOK)
+        remote_training_dir=os.environ.get("VPS_TRAINING_DIR", f"/C/Users/{vps_user}/training_data")
+        remote_model_dir=os.environ.get("VPS_MODEL_DIR", f"/C/Users/{vps_user}/models")
+        remote_visuals_dir=os.environ.get("VPS_VISUALS_DIR", f"/C/Users/{vps_user}/visualizations")
+        # --- ▲▲▲ 修正点 6 完了 ▲▲▲ ---
 
+        # --- ▼▼▼ 修正点 7: インスタンス化からパスワード引数を削除 ▼▼▼ ---
         return SFTPFileStorageService(
-            vps_ip=vps_ip, vps_user=vps_user, vps_account_password=vps_account_password,
-            key_file_path=key_file_path, remote_training_dir=remote_training_dir,
-            remote_model_dir=remote_model_dir, remote_visuals_dir=remote_visuals_dir,
+            vps_ip=vps_ip, 
+            vps_user=vps_user, 
+            # vps_account_password=vps_account_password, # ← 削除
+            key_file_path=key_file_path, 
+            remote_training_dir=remote_training_dir,
+            remote_model_dir=remote_model_dir, 
+            remote_visuals_dir=remote_visuals_dir,
             vps_port=vps_port
         )
+        # --- ▲▲▲ 修正点 7 完了 ▲▲▲ ---
     except KeyError as e: msg = f"FATAL: Missing env var for SFTP: {e}"; print(msg); raise EnvironmentError(msg)
     except Exception as e: msg = f"FATAL: Failed to init SFTPService: {e}"; print(msg); raise

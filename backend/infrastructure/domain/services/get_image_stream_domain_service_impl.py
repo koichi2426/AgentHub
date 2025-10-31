@@ -3,6 +3,10 @@ import mimetypes
 from io import BytesIO
 from typing import Tuple, Optional, BinaryIO
 import paramiko # SFTP接続用
+# --- ▼▼▼ 修正点 1: 必要な鍵クラスをインポート ▼▼▼ ---
+from paramiko.ed25519key import Ed25519Key
+# --- ▲▲▲ 修正点 1 完了 ▲▲▲ ---
+
 
 # 抽象ドメインオブジェクト/サービスのインポート
 # ★★★ 修正: パスを変更 ★★★
@@ -20,21 +24,28 @@ class SFTPFileStreamDomainServiceImpl(FileStreamDomainService):
     FileStreamDomainService の具体的な実装。
     SFTP接続を利用して、リモートVPSからファイルをBinaryStreamとして取得する。
     """
-    def __init__(self, vps_ip: str, vps_user: str, vps_password: str, vps_key_path: str, vps_port: int, remote_visuals_base_dir: str):
+    
+    # --- ▼▼▼ 修正点 2: 不要なパスワード引数を __init__ から削除 ▼▼▼ ---
+    def __init__(self, vps_ip: str, vps_user: str, vps_key_path: str, vps_port: int, remote_visuals_base_dir: str):
         self._vps_ip = vps_ip
         self._vps_user = vps_user
-        self._vps_password = vps_password
+        # self._vps_password = vps_password # ← 削除
         self._vps_key_path = vps_key_path
         self._vps_port = vps_port
         self._remote_visuals_base_dir = remote_visuals_base_dir
+    # --- ▲▲▲ 修正点 2 完了 ▲▲▲ ---
         
         # 鍵のロード
         if not os.path.exists(self._vps_key_path):
              raise FileNotFoundError(f"SSH key not found: {self._vps_key_path}")
+        
+        # --- ▼▼▼ 修正点 3: RSAKey を Ed25519Key に変更 ▼▼▼ ---
         try:
-             self._private_key = paramiko.RSAKey(filename=self._vps_key_path)
+             # self._private_key = paramiko.RSAKey(filename=self._vps_key_path) # ← 古い
+             self._private_key = paramiko.Ed25519Key(filename=self._vps_key_path) # ← 新しい鍵
         except Exception as e:
-             raise FileStreamError(f"Failed to load SSH key: {e}")
+             raise FileStreamError(f"Failed to load SSH key (tried Ed25519): {e}")
+        # --- ▲▲▲ 修正点 3 完了 ▲▲▲ ---
 
     # --- SFTP接続ヘルパー ---
     def _connect_sftp(self) -> paramiko.SFTPClient:
@@ -42,10 +53,16 @@ class SFTPFileStreamDomainServiceImpl(FileStreamDomainService):
         try:
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            # --- ▼▼▼ 修正点 4: connect() から password 引数を削除 ▼▼▼ ---
             client.connect(
-                self._vps_ip, port=self._vps_port, username=self._vps_user,
-                password=self._vps_password, pkey=self._private_key
+                self._vps_ip, 
+                port=self._vps_port, 
+                username=self._vps_user,
+                # password=self._vps_password, # ← パスワード認証は無効なので削除
+                pkey=self._private_key
             )
+            # --- ▲▲▲ 修正点 4 完了 ▲▲▲ ---
             return client.open_sftp()
         except Exception as e:
             if client: client.close()
@@ -55,10 +72,12 @@ class SFTPFileStreamDomainServiceImpl(FileStreamDomainService):
         # SSHクライアントも閉じる
         if sftp:
             try:
+                ssh_client = sftp.channel.transport # type: ignore
                 sftp.close()
-                if hasattr(sftp, '_transport') and sftp._transport: # type: ignore
-                     sftp._transport.close() # type: ignore
-            except Exception: pass
+                if ssh_client:
+                    ssh_client.close()
+            except Exception: 
+                pass # 既に閉じている場合は無視
 
 
     # --- FileStreamDomainService インターフェース実装 ---
@@ -69,6 +88,7 @@ class SFTPFileStreamDomainServiceImpl(FileStreamDomainService):
         """
         # 1. VPS上の絶対パスを構築
         # relative_path は 'job_ID/layer0/image.png' 形式
+        # (os.path.join は paramiko が良しなに / にしてくれるのでこのままでOK)
         vps_absolute_path = os.path.join(self._remote_visuals_base_dir, relative_path).replace("\\", "/")
         
         sftp = None
@@ -78,7 +98,6 @@ class SFTPFileStreamDomainServiceImpl(FileStreamDomainService):
             sftp = self._connect_sftp()
             
             # 3. ファイルをBytesIOストリームにダウンロード
-            # BytesIOはBinaryStreamプロトコルを満たす
             mem_stream = BytesIO() 
             sftp.getfo(vps_absolute_path, mem_stream)
             
@@ -106,18 +125,29 @@ def NewFileStreamDomainService() -> FileStreamDomainService:
         # 環境変数はrouter/fastapi.pyで既に読み込まれている前提
         vps_ip = os.environ["VPS_IP"]
         vps_user = os.environ["VPS_USER"]
-        vps_password = os.environ["VPS_ACCOUNT_PASSWORD"]
+        
+        # --- ▼▼▼ 修正点 5: 不要なパスワード読み込みを削除 ▼▼▼ ---
+        # vps_password = os.environ["VPS_ACCOUNT_PASSWORD"] # ← 削除
+        # --- ▲▲▲ 修正点 5 完了 ▲▲▲ ---
+        
         vps_key_path = os.environ["VPS_KEY_FILE_PATH"]
         vps_port = int(os.environ.get("VPS_PORT", 22))
         
-        # VPS_VISUALS_DIR が .env に設定されていることを前提とする
-        vps_visuals_dir = os.environ.get("VPS_VISUALS_DIR", f"/home/{vps_user}/visualizations")
+        # --- ▼▼▼ 修正点 6: 接続先はWindows (satoy機) なので、デフォルトパスをWindows形式に変更 ▼▼▼ ---
+        vps_visuals_dir = os.environ.get("VPS_VISUALS_DIR", f"/C/Users/{vps_user}/visualizations")
+        # --- ▲▲▲ 修正点 6 完了 ▲▲▲ ---
 
+        # --- ▼▼▼ 修正点 7: インスタンス化からパスワード引数を削除 ▼▼▼ ---
         return SFTPFileStreamDomainServiceImpl(
-            vps_ip=vps_ip, vps_user=vps_user, vps_password=vps_password, 
-            vps_key_path=vps_key_path, vps_port=vps_port,
+            vps_ip=vps_ip, 
+            vps_user=vps_user, 
+            # vps_password=vps_password, # ← 削除
+            vps_key_path=vps_key_path, 
+            vps_port=vps_port,
             remote_visuals_base_dir=vps_visuals_dir
         )
+        # --- ▲▲▲ 修正点 7 完了 ▲▲▲ ---
+        
     except Exception as e:
         print(f"FATAL: Failed to initialize FileStreamDomainService: {e}")
         raise EnvironmentError(f"Failed to initialize FileStreamDomainService: {e}")
