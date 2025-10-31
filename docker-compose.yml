@@ -65,13 +65,17 @@ services:
       # --- SFTP Storage Settings ---
       VPS_IP: ${VPS_IP}
       VPS_USER: ${VPS_USER}
-      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} 
+      # --- ▼▼▼ 修正点: パスワード認証は無効化したため削除 ▼▼▼ ---
+      # VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD}
+      # --- ▲▲▲ 修正完了 ▲▲▲ ---
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
       # Set defaults for optional vars
       VPS_PORT: ${VPS_PORT:-22}
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/visualizations} # <-- backend にも追加 (一貫性のため)
+      # --- ▼▼▼ 修正点: デフォルトパスを Windows (satoy機) 用に変更 ▼▼▼ ---
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/C/Users/${VPS_USER}/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/C/Users/${VPS_USER}/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/C/Users/${VPS_USER}/visualizations}
+      # --- ▲▲▲ 修正完了 ▲▲▲ ---
     restart: unless-stopped
 
   # ---------------------------------
@@ -108,13 +112,17 @@ services:
       # --- SFTP Storage Settings ---
       VPS_IP: ${VPS_IP}
       VPS_USER: ${VPS_USER}
-      VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD} 
+      # --- ▼▼▼ 修正点: パスワード認証は無効化したため削除 ▼▼▼ ---
+      # VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD}
+      # --- ▲▲▲ 修正完了 ▲▲▲ ---
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
       # Set defaults for optional vars
       VPS_PORT: ${VPS_PORT:-22}
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/visualizations} # <-- これを追加
+      # --- ▼▼▼ 修正点: デフォルトパスを Windows (satoy機) 用に変更 ▼▼▼ ---
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/C/Users/${VPS_USER}/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/C/Users/${VPS_USER}/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/C/Users/${VPS_USER}/visualizations}
+      # --- ▲▲▲ 修正完了 ▲▲▲ ---
     restart: unless-stopped
     
   # ---------------------------------
