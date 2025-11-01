@@ -30,7 +30,7 @@ services:
     expose:
       - "6379"
     volumes:
-      - redis_data:/data 
+      - redis_data:/data
     restart: unless-stopped
 
   # ---------------------------------
@@ -71,12 +71,10 @@ services:
       VPS_IP: ${VPS_IP}
       VPS_USER: ${VPS_USER}
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
-      VPS_PORT: ${VPS_PORT:-22}
-      # --- ▼ 修正済み: Linux実体のパスに変更 ▼ ---
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/AgentHubStorage/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/AgentHubStorage/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/AgentHubStorage/visualizations}
-      # --- ▲ 修正完了 ▲ ---
+      VPS_PORT: ${VPS_PORT}
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR}
     restart: unless-stopped
 
   # ---------------------------------
@@ -114,14 +112,12 @@ services:
       VPS_IP: ${VPS_IP}
       VPS_USER: ${VPS_USER}
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
-      VPS_PORT: ${VPS_PORT:-22}
-      # --- ▼ 修正済み: Linux実体のパスに変更 ▼ ---
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/AgentHubStorage/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/AgentHubStorage/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/AgentHubStorage/visualizations}
-      # --- ▲ 修正完了 ▲ ---
+      VPS_PORT: ${VPS_PORT}
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR}
     restart: unless-stopped
-    
+
   # ---------------------------------
   # ジョブ監視サービス (Celery Flower)
   # ---------------------------------
@@ -131,7 +127,7 @@ services:
     ports:
       - "5555:5555"
     environment:
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL} 
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
     depends_on:
       - redis
