@@ -28,7 +28,7 @@ services:
     image: redis:7-alpine
     container_name: agenthub_redis
     expose:
-      - "6379" # 内部ポートのみ公開
+      - "6379"
     volumes:
       - redis_data:/data 
     restart: unless-stopped
@@ -45,52 +45,6 @@ services:
       - "8000:8000"
     volumes:
       - ./backend:/app
-      # --- Mount SSH Key (Read-Only) ---
-      - ${VPS_KEY_HOST_PATH}:${VPS_KEY_FILE_PATH}:ro
-    depends_on:
-      db:
-        condition: service_healthy
-      redis: # Redisへの依存を追加
-        condition: service_started
-    environment:
-      DB_HOST: ${DB_HOST}
-      DB_PORT: ${DB_PORT}
-      DB_USER: ${DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD}
-      DB_NAME: ${DB_NAME}
-      SECRET_KEY: ${SECRET_KEY}
-      ALGORITHM: ${ALGORITHM}
-      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL} # .envから読み込み
-      # --- SFTP Storage Settings ---
-      VPS_IP: ${VPS_IP}
-      VPS_USER: ${VPS_USER}
-      # --- ▼▼▼ 修正点: パスワード認証は無効化したため削除 ▼▼▼ ---
-      # VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD}
-      # --- ▲▲▲ 修正完了 ▲▲▲ ---
-      VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
-      # Set defaults for optional vars
-      VPS_PORT: ${VPS_PORT:-22}
-      # --- ▼▼▼ 修正点: デフォルトパスを Windows (satoy機) 用に変更 ▼▼▼ ---
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/Users/${VPS_USER}/AgentHubStorage/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/Users/${VPS_USER}/AgentHubStorage/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/Users/${VPS_USER}/AgentHubStorage/visualizations}
-      # --- ▲▲▲ 修正完了 ▲▲▲ ---
-    restart: unless-stopped
-
-  # ---------------------------------
-  # ワーカーサービス (Celery)
-  # ---------------------------------
-  celery_worker:
-    build:
-      context: ./worker # 独立したworkerフォルダを使用
-      dockerfile: Dockerfile
-    container_name: agenthub_celery_worker
-    # Celeryアプリのエントリーポイントと単一実行を保証するコマンド
-    command: celery -A worker.celery_app worker -l info --pool=solo --max-tasks-per-child=1
-    volumes:
-      - ./worker:/app/worker
-      # --- Mount SSH Key (Read-Only) ---
       - ${VPS_KEY_HOST_PATH}:${VPS_KEY_FILE_PATH}:ro
     depends_on:
       db:
@@ -98,31 +52,74 @@ services:
       redis:
         condition: service_started
     environment:
-      # DB接続情報
+      # DB設定
       DB_HOST: ${DB_HOST}
       DB_PORT: ${DB_PORT}
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: ${DB_NAME}
-      # Celery 設定
+
+      # 認証・セキュリティ
+      SECRET_KEY: ${SECRET_KEY}
+      ALGORITHM: ${ALGORITHM}
+      ACCESS_TOKEN_EXPIRE_MINUTES: ${ACCESS_TOKEN_EXPIRE_MINUTES}
+
+      # Celery設定
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+
+      # --- SFTP接続設定 ---
+      VPS_IP: ${VPS_IP}
+      VPS_USER: ${VPS_USER}
+      VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
+      VPS_PORT: ${VPS_PORT:-22}
+      # --- ▼ 修正済み: Linux実体のパスに変更 ▼ ---
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/AgentHubStorage/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/AgentHubStorage/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/AgentHubStorage/visualizations}
+      # --- ▲ 修正完了 ▲ ---
+    restart: unless-stopped
+
+  # ---------------------------------
+  # ワーカーサービス (Celery)
+  # ---------------------------------
+  celery_worker:
+    build:
+      context: ./worker
+      dockerfile: Dockerfile
+    container_name: agenthub_celery_worker
+    command: celery -A worker.celery_app worker -l info --pool=solo --max-tasks-per-child=1
+    volumes:
+      - ./worker:/app/worker
+      - ${VPS_KEY_HOST_PATH}:${VPS_KEY_FILE_PATH}:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    environment:
+      # DB設定
+      DB_HOST: ${DB_HOST}
+      DB_PORT: ${DB_PORT}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME}
+
+      # Celery設定
       CELERY_BROKER_URL: ${CELERY_BROKER_URL}
       CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
       CELERY_TASK_TIME_LIMIT: ${CELERY_TASK_TIME_LIMIT}
       CELERY_TASK_MAX_RETRIES: ${CELERY_TASK_MAX_RETRIES}
-      # --- SFTP Storage Settings ---
+
+      # --- SFTP接続設定 ---
       VPS_IP: ${VPS_IP}
       VPS_USER: ${VPS_USER}
-      # --- ▼▼▼ 修正点: パスワード認証は無効化したため削除 ▼▼▼ ---
-      # VPS_ACCOUNT_PASSWORD: ${VPS_ACCOUNT_PASSWORD}
-      # --- ▲▲▲ 修正完了 ▲▲▲ ---
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
-      # Set defaults for optional vars
       VPS_PORT: ${VPS_PORT:-22}
-      # --- ▼▼▼ 修正点: デフォルトパスを Windows (satoy機) 用に変更 ▼▼▼ ---
-      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/Users/${VPS_USER}/AgentHubStorage/training_data}
-      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/Users/${VPS_USER}/AgentHubStorage/models}
-      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/Users/${VPS_USER}/AgentHubStorage/visualizations}
-      # --- ▲▲▲ 修正完了 ▲▲▲ ---
+      # --- ▼ 修正済み: Linux実体のパスに変更 ▼ ---
+      VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/AgentHubStorage/training_data}
+      VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/AgentHubStorage/models}
+      VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/AgentHubStorage/visualizations}
+      # --- ▲ 修正完了 ▲ ---
     restart: unless-stopped
     
   # ---------------------------------
@@ -165,9 +162,8 @@ services:
       retries: 5
 
 # ---------------------------------
-# 名前付きボリュームの定義
+# 永続化ボリューム
 # ---------------------------------
 volumes:
   mysql_data:
   redis_data:
-
