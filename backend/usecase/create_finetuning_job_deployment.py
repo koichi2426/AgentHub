@@ -88,7 +88,6 @@ class CreateFinetuningJobDeploymentInteractor:
         self.agent_repo = agent_repo
         self.auth_service = auth_service
         
-        # ★★★ START: 修正点 1 (環境変数の読み込み) ★★★
         # C++エンジンのベースURLを環境変数から読み込む
         base_url = os.environ.get("AGENTHUB_ENGINE_BASE_URL")
         if not base_url:
@@ -96,7 +95,6 @@ class CreateFinetuningJobDeploymentInteractor:
         if not base_url.endswith('/'):
             base_url += '/'
         self.engine_base_url = base_url
-        # ★★★ END: 修正点 1 ★★★
 
     def execute(
         self, input: CreateFinetuningJobDeploymentInput
@@ -105,7 +103,6 @@ class CreateFinetuningJobDeploymentInteractor:
         トークンでユーザーを認証し、指定されたJob IDの
         デプロイメントを新規作成する。
         """
-        # (Presenterが変換失敗したときのために、空のDTOは作れない)
         
         try:
             # 1. 認証 (Auth)
@@ -124,14 +121,13 @@ class CreateFinetuningJobDeploymentInteractor:
             if agent is None:
                 raise FileNotFoundError(f"Agent {job.agent_id} (for job {job.id}) not found.")
             
-            # 🚨 修正: Agentの`owner`ではなく`user_id`フィールドを参照
+            # Agentの`owner`ではなく`user_id`フィールドを参照
             if agent.user_id != user.id:
                 raise PermissionError(
                     "User does not have permission to create a deployment for this job."
                 )
 
             # 4. ロジック本体 (Create)
-            # ▼▼▼ 新規ロジック ▼▼▼
             
             # 4a. 既存デプロイメントのチェック（ジョブ：デプロイ＝1：1 のため）
             existing_deployment = self.deployment_repo.find_by_job_id(job_id_vo)
@@ -141,12 +137,10 @@ class CreateFinetuningJobDeploymentInteractor:
                     f"Deployment for job {input.job_id} already exists (ID: {existing_deployment.id})."
                 )
 
-            # ★★★ START: 修正点 2 (エンドポイントの構築) ★★★
             # 4b. エンドポイントURLを構築 (例: "http://.../job45/predict")
             job_path = f"job{job_id_vo.value}/"
             predict_endpoint_path = urljoin(job_path, "predict")
             full_endpoint = urljoin(self.engine_base_url, predict_endpoint_path)
-            # ★★★ END: 修正点 2 ★★★
 
             # 4c. 新しいデプロイメントエンティティを準備
             # (IDはリポジトリ(DB)側で採番されることを期待し、ダミーのID(0)をセット)
@@ -154,13 +148,11 @@ class CreateFinetuningJobDeploymentInteractor:
                 id=ID(0), # 採番前ダミーID
                 job_id=job_id_vo,
                 status="inactive", # 新規作成時は「非アクティブ」
-                endpoint=full_endpoint # ★★★ 修正点 3: None から構築したURLに変更 ★★★
+                endpoint=full_endpoint
             )
             
             # 4d. リポジトリに作成を依頼
             created_deployment: Deployment = self.deployment_repo.create(new_deployment_data)
-
-            # ▲▲▲ 新規ロジック ▲▲▲
             
             # 5. Presenterに渡してOutput DTOに変換
             output = self.presenter.output(created_deployment)
@@ -184,7 +176,6 @@ def new_create_finetuning_job_deployment_interactor(
     agent_repo: AgentRepository,
     auth_service: AuthDomainService,
 ) -> "CreateFinetuningJobDeploymentUseCase":
-    # ★ 修正点 4: __init__ が環境変数を読むようになったため、ファクトリは引数を変更する必要なし
     return CreateFinetuningJobDeploymentInteractor(
         presenter=presenter,
         deployment_repo=deployment_repo,

@@ -5,8 +5,6 @@ import { API_URL } from "../config";
 // ======================================
 // リクエストデータ型 (なし)
 // ======================================
-// このAPIはリクエストボディを必要としません。
-// job_id は URL パスパラメータとして送信します。
 export interface CreateFinetuningJobDeploymentRequest {
   // (Empty)
 }
@@ -38,8 +36,7 @@ interface ApiError {
 
 /**
  * 特定のジョブIDに基づいて、デプロイメント（エンドポイント情報）をDBに作成する。
- * (バックエンドの C++ Watcher への通知はこのAPIとは別に行われる前提)
- * * @param jobId - デプロイメントを作成する対象の Finetuning Job ID (URLパスパラメータ)
+ * @param jobId - デプロイメントを作成する対象の Finetuning Job ID (URLパスパラメータ)
  * @param token - ユーザー認証トークン
  * @returns 作成されたデプロイメント情報
  */
@@ -50,26 +47,23 @@ export async function createFinetuningJobDeployment(
   // POST /v1/jobs/{job_id}/deployment エンドポイント
   const url = `${API_URL}/v1/jobs/${jobId}/deployment`;
 
-  // このAPIはリクエストボディ（FormDataやJSON）を必要としません。
-
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: {
-        // ボディが空の場合でも、認証情報は必要
         "Authorization": `Bearer ${token}`,
-        // ボディが空なので Content-Type は設定しない
+        // ★ 修正: FastAPIに空のJSONボディを送ることを明示 ★
+        "Content-Type": "application/json", 
       },
-      // body: (リクエストボディなし)
+      // ★ 修正: ボディとして空のJSONオブジェクトを送信 ★
+      body: JSON.stringify({}), 
     });
 
     if (!response.ok) {
-      // エラーレスポンスをJSONとしてパース (400, 401, 404, 409 FileExistsError など)
       const errorData: ApiError = await response.json();
       throw new Error(errorData.error || `HTTP error! status: ${response.status} ${response.statusText}`);
     }
     
-    // 成功レスポンス (201 Created) をパース
     return await response.json() as CreateFinetuningJobDeploymentResponse;
 
   } catch (error) {

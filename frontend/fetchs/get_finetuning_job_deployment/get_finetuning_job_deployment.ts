@@ -5,8 +5,6 @@ import { API_URL } from "../config";
 // ======================================
 // リクエストデータ型 (なし)
 // ======================================
-// このAPIはリクエストボディを必要としません。
-// job_id は URL パスパラメータとして送信します。
 export interface GetFinetuningJobDeploymentRequest {
   // (Empty)
 }
@@ -14,7 +12,6 @@ export interface GetFinetuningJobDeploymentRequest {
 // ======================================
 // レスポンスデータ型 (バックエンドの Output DTO に対応)
 // ======================================
-// (Python: GetFinetuningJobDeploymentOutput)
 export interface GetFinetuningJobDeploymentResponse {
   id: number;
   finetuning_job_id: number; // Python Presenter の 'finetuning_job_id' に対応
@@ -48,21 +45,19 @@ export async function getFinetuningJobDeployment(
 
   try {
     const response = await fetch(url, {
-      method: "GET", // ★ GETリクエスト
+      method: "GET", 
       headers: {
         "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
+        // ★ 修正: GETリクエストなので、Content-Typeは削除し、ヘッダーをクリーンにする ★
+        // "Content-Type": "application/json", 
       },
-      // body: (GETリクエストのためボディなし)
     });
 
     if (!response.ok) {
-      // エラーレスポンスをJSONとしてパース (400, 401, 404 など)
       const errorData: ApiError = await response.json();
       throw new Error(errorData.error || `HTTP error! status: ${response.status} ${response.statusText}`);
     }
     
-    // 成功レスポンス (200 OK) をパース
     return await response.json() as GetFinetuningJobDeploymentResponse;
 
   } catch (error) {
