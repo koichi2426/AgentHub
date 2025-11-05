@@ -44,7 +44,7 @@ export default function DeploymentDetailPage({
     const foundDeployment = (rawDeployments as unknown as Deployment[]).find((d) => d.id === deploymentid);
     
     const allMethods = rawMethods as DeploymentMethodsEntry[];
-    const methodEntry = allMethods.find((m) => m.deploymentId === deploymentid);
+    const methodEntry = allMethods.find((m) => m.deployment_id === deploymentid);
     
     const methodList = methodEntry ? methodEntry.methods : [];
 

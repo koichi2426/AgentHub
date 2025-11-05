@@ -67,6 +67,7 @@ export type Visualizations = {
 
 // デプロイメントメソッドのモックデータ型定義
 export type DeploymentMethodsEntry = {
-  deploymentId: string;
+  id: string;          // 修正：一意のIDを追加
+  deployment_id: string; // 修正：snake_caseに統一
   methods: string[];
 };
