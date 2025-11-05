@@ -49,6 +49,12 @@ from adapter.presenter.get_agent_finetuning_jobs_presenter import new_get_agent_
 from usecase.get_agent_finetuning_jobs import GetAgentFinetuningJobsInput, GetAgentFinetuningJobsOutput, new_get_agent_finetuning_jobs_interactor
 # ▲▲▲ 修正ここまで ▲▲▲
 
+# ★★★ START: Get Agent Deployments 関連のインポート ★★★
+from adapter.controller.get_agent_deployments_controller import GetAgentDeploymentsController
+from adapter.presenter.get_agent_deployments_presenter import new_get_agent_deployments_presenter
+from usecase.get_agent_deployments import GetAgentDeploymentsInput, GetAgentDeploymentsOutput, new_get_agent_deployments_interactor
+# ★★★ END: Get Agent Deployments 関連のインポート ★★★
+
 # ▼▼▼ [新規追加] Get Weight Visualizations 関連のインポート ▼▼▼
 from adapter.controller.get_weight_visualizations_controller import GetWeightVisualizationsController
 from adapter.presenter.get_weight_visualizations_presenter import new_get_finetuning_job_visualization_presenter
@@ -316,14 +322,46 @@ def get_agent_finetuning_jobs(
         )
 
         controller = GetAgentFinetuningJobsController(usecase) 
-        input_data = GetAgentFinetuningJobsInput(token=token, agent_id=agent_id)
         
-        response_dict = controller.execute(token=token, agent_id=agent_id) # ★★★ 修正が必要かも ★★★
+        # Controllerのexecuteに引数を渡す
+        response_dict = controller.execute(token=token, agent_id=agent_id) 
         
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 # ▲▲▲ Agentのファインチューニングジョブ一覧取得エンドポイント ▲▲▲
+
+
+# ★★★ START: Get Agent Deployments エンドポイント (新規追加) ★★★
+@router.get("/v1/agents/{agent_id}/deployments", response_model=GetAgentDeploymentsOutput)
+def get_agent_deployments(
+    agent_id: int = Path(..., description="ID of the Agent"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    特定のAgentに紐づくデプロイメント（エンドポイント、ステータス）の一覧を取得する。
+    """
+    try:
+        token = credentials.credentials
+        auth_service = NewAuthDomainService(user_repo)
+
+        presenter = new_get_agent_deployments_presenter()
+        usecase = new_get_agent_deployments_interactor(
+            presenter=presenter,
+            deployment_repo=deployment_repo, # DI: デプロイメント取得用
+            agent_repo=agent_repo,           # DI: 権限チェック用
+            auth_service=auth_service,
+        )
+
+        controller = GetAgentDeploymentsController(usecase)
+        
+        # Controllerのexecuteに引数を渡す
+        response_dict = controller.execute(token=token, agent_id=agent_id)
+        
+        return handle_response(response_dict, success_code=200)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+# ★★★ END: Get Agent Deployments エンドポイント ★★★
 
 
 # ▼▼▼ [新規追加] 重み可視化データ取得エンドポイント ★★★ ▼▼▼

@@ -13,17 +13,22 @@ import Cookies from "js-cookie";
 
 // ▼▼▼ [修正] Finetuning Jobs Fetcherと型をインポート ★★★ ▼▼▼
 import { 
-  getAgentFinetuningJobs, // ★ 関数名を修正
+  getAgentFinetuningJobs, 
   FinetuningJobListItem, 
-} from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; // ★ ファイルパスも修正が必要
+} from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
 // ▲▲▲ 修正ここまで ★★★ ▲▲▲
+
+// ★★★ 修正1: Get Agent Deployments Fetcherと型をインポート ★★★
+import { 
+    getAgentDeployments, 
+    DeploymentListItem, 
+} from "@/fetchs/get_agent_deployments/get_agent_deployments";
 
 import AgentTabFineTuning from "@/components/agent-tabs/agent-tab-finetuning";
 import AgentTabDeployments from "@/components/agent-tabs/agent-tab-deployments";
 import AgentTabSettings from "@/components/agent-tabs/agent-tab-settings";
 
 import type { User, Agent, FinetuningJob, Deployment } from "@/lib/data"; 
-// NOTE: AgentListItem を FinetuningJob[] に変換して下流コンポーネントに渡します。
 
 // ページパラメータ型
 type Params = { username: string; agentname: string };
@@ -41,6 +46,9 @@ export default function AgentPage({
   const [user, setUser] = useState<GetUserResponse | null>(null);
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [finetuningJobs, setFinetuningJobs] = useState<FinetuningJobListItem[]>([]);
+  // ★★★ 修正2: Deployments の State を追加 ★★★
+  const [agentDeployments, setAgentDeployments] = useState<DeploymentListItem[]>([]);
+  
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null); // エラーハンドリング用
 
@@ -53,27 +61,23 @@ export default function AgentPage({
       }
 
       try {
-        // 1. ユーザー情報を取得
+        // ... (省略: ユーザーとエージェントの取得・チェックロジック) ...
         const currentUser = await getUser(token);
 
-        // 2. URLのユーザー名と認証済みユーザーが一致する場合は404
         if (currentUser.username.toLowerCase() !== username.toLowerCase()) {
           notFound();
           return;
         }
         setUser(currentUser);
 
-        // 3. ユーザーのエージェント一覧を取得
         const agentsResponse = await getUserAgents(token);
         
-        // 4. URL パラメータに一致するエージェントを検索
         const foundAgent = agentsResponse.agents.find(
           (a) =>
             a.owner.toLowerCase() === username.toLowerCase() &&
             a.name.toLowerCase() === agentname.toLowerCase()
         );
 
-        // 5. エージェントが見つからなければ404
         if (!foundAgent) {
             notFound();
             return;
@@ -81,17 +85,18 @@ export default function AgentPage({
 
         setAgent(foundAgent);
 
-        // 6. ▼▼▼ [修正] ファインチューニングジョブ一覧を取得（Agent IDを渡す） ★★★ ▼▼▼
-        // APIの責務が変更されたため、Agent IDを引数に渡し、フィルタリングはバックエンドに任せる
-        const jobsResponse = await getAgentFinetuningJobs(foundAgent.id, token);
+        // --- データ取得を並列化 ---
+        const [jobsResponse, deploymentsResponse] = await Promise.all([
+            getAgentFinetuningJobs(foundAgent.id, token), // Finetuning Jobs
+            getAgentDeployments(foundAgent.id, token),      // ★★★ 修正3: Deployments を取得 ★★★
+        ]);
         
-        // 7. クライアント側でのフィルタリングロジックを削除
         setFinetuningJobs(jobsResponse.jobs);
-        // ▲▲▲ 修正ここまで ★★★ ▲▲▲
+        setAgentDeployments(deploymentsResponse.deployments); // ★★★ 修正3: Stateにセット ★★★
+        // ... (省略: データ取得のロジックはここまで) ...
 
       } catch (e) {
         console.error("Failed to fetch agent data:", e);
-        // エージェント情報だけでなく、ジョブ情報取得失敗もキャッチ
         setError("Failed to load agent or job details. Please check your network or token.");
       } finally {
         setIsLoading(false);
@@ -111,7 +116,8 @@ export default function AgentPage({
     );
   }
 
-  // 認証済みだがデータ取得でエラーが発生した場合
+  // ... (省略: エラーチェックと notFound ロジック) ...
+
   if (error) {
      return (
         <div className="container mx-auto max-w-6xl p-4 md:p-10 text-center text-red-500">
@@ -120,7 +126,6 @@ export default function AgentPage({
     );
   }
 
-  // userまたはagentがnullの場合は notFound
   if (!user || !agent) {
     return notFound(); 
   }
@@ -129,10 +134,11 @@ export default function AgentPage({
   const agentCasted = agent as unknown as Agent;
   const userCasted = user as unknown as User;
 
-  // --- フィルタリングされたジョブデータを、既存の AgentTabFineTuning の型に合わせる ---
-  // NOTE: ここでは FinetuningJobListItem[] を FinetuningJob[] としてキャストします
+  // --- ジョブデータを下流コンポーネメントの型に合わせる ---
   const agentJobsCasted = finetuningJobs as unknown as FinetuningJob[]; 
-  const agentDeployments: Deployment[] = []; // デプロイメントデータはAPI未実装のため空配列を維持
+  
+  // ★★★ 修正4: デプロイメントデータを下流コンポーネントの型に合わせる ★★★
+  const deploymentsCasted = agentDeployments as unknown as Deployment[]; 
 
   // --- JSX 出力 ---
   return (
@@ -173,7 +179,12 @@ export default function AgentPage({
 
         {/* --- Deployments タブ --- */}
         <TabsContent value="api" className="mt-6">
-          <AgentTabDeployments deployments={agentDeployments} username={user.username} agentname={agent.name}/>
+          {/* ★★★ 修正5: 取得したデプロイメントデータを渡す ★★★ */}
+          <AgentTabDeployments 
+            deployments={deploymentsCasted} 
+            username={user.username} 
+            agentname={agent.name}
+          />
         </TabsContent>
 
         {/* --- Settings タブ --- */}
