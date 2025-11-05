@@ -46,7 +46,9 @@ class MethodListItemDTO:
 
 @dataclass
 class GetDeploymentMethodsOutput:
-    # Presenterと整合させるため、内部DTOのリストを持つ
+    # ⬇️⬇️⬇️ 修正箇所1: deployment_id を追加 ⬇️⬇️⬇️
+    deployment_id: int 
+    # ⬆️⬆️⬆️ 修正箇所1 ⬆️⬆️⬆️
     methods: List[MethodListItemDTO]
 
 
@@ -55,9 +57,10 @@ class GetDeploymentMethodsOutput:
 # ======================================
 class GetDeploymentMethodsPresenter(abc.ABC):
     @abc.abstractmethod
-    # PresenterはValue Objectのリストを受け取り、Output DTOに変換する
-    def output(self, methods: List[Method]) -> GetDeploymentMethodsOutput:
+    # ⬇️⬇️⬇️ 修正箇所2: deployment_id も引数として渡すように変更 ⬇️⬇️⬇️
+    def output(self, deployment_id: int, methods: List[Method]) -> GetDeploymentMethodsOutput:
         pass
+    # ⬆️⬆️⬆️ 修正箇所2 ⬆️⬆️⬆️
 
 
 # ======================================
@@ -113,12 +116,14 @@ class GetDeploymentMethodsInteractor:
 
             # ★★★ 修正3: ロジック本体 - リポジトリから取得 ★★★
             
-            # 3a. デプロイメントIDを取得 (Setのロジックを流用)
+            # 3a. デプロイメントIDを取得
             deployment: Optional[Deployment] = self.deployment_repo.find_by_job_id(job_id_vo)
             
             if deployment is None:
                 method_vos = [] # デプロイメントがない場合はメソッドもない
+                deployment_id_value = 0 # IDがない場合はダミー値
             else:
+                deployment_id_value = deployment.id.value # IDオブジェクトから値を取得
                 # 3b. デプロイメントIDからメソッドエンティティを取得
                 methods_entity: Optional[DeploymentMethods] = self.methods_repo.find_by_deployment_id(deployment.id)
 
@@ -127,13 +132,17 @@ class GetDeploymentMethodsInteractor:
                 else:
                     method_vos = methods_entity.methods # Value Objectのリストを取得
 
-            # 4. Presenterに Value Object のリストを渡す
-            output = self.presenter.output(method_vos) 
+            # 4. Presenterに Value Object のリストと ID を渡す
+            # ⬇️⬇️⬇️ 修正箇所3: deployment_id を Presenter に渡す ⬇️⬇️⬇️
+            output = self.presenter.output(deployment_id_value, method_vos) 
+            # ⬆️⬆️⬆️ 修正箇所3 ⬆️⬆️⬆️
             return output, None
             
         except Exception as e:
             # エラー時は空のDTOと例外を返す
-            empty_output = GetDeploymentMethodsOutput(methods=[])
+            # ⬇️⬇️⬇️ 修正箇所4: エラー時の Output DTO にも deployment_id を追加 ⬇️⬇️⬇️
+            empty_output = GetDeploymentMethodsOutput(deployment_id=0, methods=[])
+            # ⬆️⬆️⬆️ 修正箇所4 ⬆️⬆️⬆️
             return empty_output, e
 
 

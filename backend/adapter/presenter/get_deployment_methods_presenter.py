@@ -3,25 +3,29 @@ from typing import List
 from usecase.get_deployment_methods import (
     GetDeploymentMethodsPresenter,
     GetDeploymentMethodsOutput,
-    MethodListItemDTO, # ★ Output DTOの内部DTOをインポート
+    MethodListItemDTO, 
 )
 
+# ★★★ 修正箇所1: ユースケースから渡されるデータ型を明示的にインポートするか、定義する ★★★
+# ここでは、ユースケースが deployment_id を直接渡すと仮定し、インターフェースを修正します。
 
 class GetDeploymentMethodsPresenterImpl(GetDeploymentMethodsPresenter):
-    # ユースケースからの出力が List[Method] (Value Object) だと仮定して修正
-    def output(self, method_vos: List[str]) -> GetDeploymentMethodsOutput:
+    # 修正: deployment_id を追加で受け取るようにする
+    # ※ methods_vos は List[Method] (Value Object) だと仮定
+    def output(self, deployment_id: int, method_vos: List) -> GetDeploymentMethodsOutput:
         """
-        メソッドの文字列リスト（Value Object）を GetDeploymentMethodsOutput DTO に変換して返す。
+        メソッド情報とデプロイメントIDを受け取り、Output DTOに変換して返す。
         """
         
         # Value Object (Method) が持つメソッド名（文字列）を取得し、DTOに変換
         method_list_dtos: List[MethodListItemDTO] = [
             MethodListItemDTO(name=method_vo.name) 
-            for method_vo in method_vos # 引数名を method_vos に変更
+            for method_vo in method_vos
         ]
 
-        # GetDeploymentMethodsOutput は deployment_id を持たないと仮定し、methodsのみを返す
+        # ★★★ 修正箇所2: deployment_id も含めて Output DTO を作成 ★★★
         return GetDeploymentMethodsOutput(
+            deployment_id=deployment_id, # ← 追加！
             methods=method_list_dtos
         )
 
