@@ -184,13 +184,6 @@ class CreateAgentRequest(BaseModel):
     name: str
     description: Optional[str]
 
-# ★★★ START: 4 NEW DEPLOYMENT APIs REQUEST DTO (ここから追加) ★★★
-class SetDeploymentMethodsRequest(BaseModel):
-    """ POST /v1/jobs/{job_id}/methods で使用するリクエストボディ """
-    methods: List[str]
-# ★★★ END: 4 NEW DEPLOYMENT APIs REQUEST DTO (ここまで追加) ★★★
-
-
 # === Auth and User Routes (中略) ===
 @router.post("/v1/auth/signup", response_model=CreateUserOutput)
 def create_user(request: CreateUserRequest):
@@ -465,11 +458,11 @@ def get_methods(
     except Exception as e:
         return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
 
-
-# --- 4. メソッド設定 (POST /v1/jobs/{job_id}/methods) ---
-@router.post("/v1/jobs/{job_id}/methods", response_model=SetDeploymentMethodsOutput)
+# --- 4. メソッド設定 (PUT /v1/jobs/{job_id}/methods) ---
+# 1. HTTPメソッドを PUT に変更
+@router.put("/v1/jobs/{job_id}/methods", response_model=SetDeploymentMethodsOutput) 
 def set_methods(
-    request: SetDeploymentMethodsRequest,
+    # 2. クライアントからの入力が不要なため、Request DTO を削除 (既に削除済みとして扱う)
     job_id: int = Path(..., description="ID of the Finetuning Job"),
     credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
 ):
@@ -478,25 +471,35 @@ def set_methods(
     """
     try:
         token = credentials.credentials
+        
+        # 3. input_data の修正: methods=request.methods の行を削除し、エラーを解消 (既に削除済みとして扱う)
         input_data = SetDeploymentMethodsInput(
             token=token,
             job_id=job_id
         )
+        
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_set_deployment_methods_presenter()
         
+        # ⬇️⬇️⬇️ ここを修正！ method_finder_service を追加 ⬇️⬇️⬇️
         usecase = new_set_deployment_methods_interactor(
             presenter=presenter,
             methods_repo=methods_repo,
             deployment_repo=deployment_repo,
             job_repo=finetuning_job_repo, # 権限チェック用
             agent_repo=agent_repo,        # 権限チェック用
-            auth_service=auth_service
+            auth_service=auth_service,
+            # ★★★ 最終修正：これが抜けていた引数！ ★★★
+            method_finder_service=job_method_finder_service 
         )
+        # ⬆️⬆️⬆️ 修正完了 ⬆️⬆️⬆️
+        
         controller = SetDeploymentMethodsController(usecase)
         response_dict = controller.execute(input_data=input_data)
         return handle_response(response_dict, success_code=200) # 200 OK
     except Exception as e:
+        # エラーログはサーバー側で確認しやすいよう修正しておくとベター
+        print(f"Set Methods Error: {e}") 
         return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
 
 # ★★★ END: 4 NEW DEPLOYMENT APIs (ここまで追加) ★★★

@@ -122,9 +122,7 @@ class SetDeploymentMethodsInteractor:
             # ▲▲▲ 修正箇所 ▲▲▲
 
             # 4. 親となるデプロイメントを取得
-            # 注: find_by_job_idはリストを返す可能性があるため、ここでは単一のデプロイメントを想定
-            deployments: List[Deployment] = self.deployment_repo.find_by_job_id(job_id_vo)
-            deployment: Optional[Deployment] = deployments[0] if deployments else None
+            deployment: Optional[Deployment] = self.deployment_repo.find_by_job_id(job_id_vo)
             
             if deployment is None:
                 raise FileNotFoundError(
