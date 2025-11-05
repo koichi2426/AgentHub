@@ -3,14 +3,28 @@
 import { API_URL } from "../config";
 
 // ======================================
-// レスポンスデータ型 (バックエンドの SetDeploymentMethodsOutput に対応)
+// 内部DTO
 // ======================================
-// (Python: SetDeploymentMethodsOutput(methods=methods))
+export interface MethodListItemDTO {
+  /**
+   * メソッド名（機能の文字列）
+   */
+  name: string;
+}
+
+// ======================================
+// レスポンスデータ型
+// ======================================
 export interface SetDeploymentMethodsResponse {
   /**
-   * DBに保存されたメソッド（機能）の文字列リスト
+   * 処理されたデプロイメントのID
    */
-  methods: string[];
+  deployment_id: number;
+  
+  /**
+   * DBに保存されたメソッド（機能）のリスト
+   */
+  methods: MethodListItemDTO[];
 }
 
 // ======================================
@@ -39,12 +53,12 @@ export async function setDeploymentMethods(
 
   try {
     const response = await fetch(url, {
-      method: "POST",
+      method: "PUT",
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({}), // ★ リクエストボディは空
+      body: JSON.stringify({}),
     });
 
     if (!response.ok) {

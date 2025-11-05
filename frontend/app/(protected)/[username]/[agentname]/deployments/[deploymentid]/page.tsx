@@ -10,8 +10,9 @@ import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_
 import { getUserFinetuningJobs, FinetuningJobListItem } from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
 import { getFinetuningJobDeployment, GetFinetuningJobDeploymentResponse } from "@/fetchs/get_finetuning_job_deployment/get_finetuning_job_deployment";
 import { createFinetuningJobDeployment } from "@/fetchs/create_finetuning_job_deployment/create_finetuning_job_deployment";
-import { getDeploymentMethods } from "@/fetchs/get_deployment_methods/get_deployment_methods";
-import { setDeploymentMethods } from "@/fetchs/set_deployment_methods/set_deployment_methods";
+// ★★★ 修正箇所1: 型のインポートを修正 ★★★
+import { getDeploymentMethods, MethodListItemDTO } from "@/fetchs/get_deployment_methods/get_deployment_methods"; 
+import { setDeploymentMethods } from "@/fetchs/set_deployment_methods/set_deployment_methods"; 
 
 // UIコンポーネント
 import DeploymentBreadcrumb from "@/components/deployments/DeploymentBreadcrumb";
@@ -38,7 +39,8 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
   const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
   const [deploymentData, setDeploymentData] = useState<GetFinetuningJobDeploymentResponse | null>(null);
-  const [methods, setMethods] = useState<string[]>([]);
+  // ★★★ 修正箇所2: methodsの状態を MethodListItemDTO[] に変更 ★★★
+  const [methods, setMethods] = useState<MethodListItemDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -99,9 +101,11 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         if (!deployment) {
           try {
             const created = await createFinetuningJobDeployment(Number(foundJob.id), token);
+            // created.deployment は GetFinetuningJobDeploymentResponse と同じ構造ではないため、
+            // 必要なプロパティだけを抽出してキャストします
             deployment = {
               id: created.deployment.id,
-              finetuning_job_id: created.deployment.job_id, // 型補完
+              finetuning_job_id: created.deployment.job_id,
               status: created.deployment.status,
               endpoint: created.deployment.endpoint,
             } as GetFinetuningJobDeploymentResponse;
@@ -117,13 +121,13 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         // --- Step 3: メソッド一覧取得 ---
         try {
           const methodsRes = await getDeploymentMethods(Number(foundJob.id), token);
-          setMethods(methodsRes.methods);
+          setMethods(methodsRes.methods); // ★★★ 修正3: methodsRes.methods は既に MethodListItemDTO[] ★★★
         } catch (err) {
           console.warn("WARN: getDeploymentMethods failed, initializing defaults...");
           try {
             const setRes = await setDeploymentMethods(Number(foundJob.id), token);
             console.info("Default methods initialized:", setRes.methods);
-            setMethods(setRes.methods);
+            setMethods(setRes.methods); // ★★★ 修正3: setRes.methods は既に MethodListItemDTO[] ★★★
           } catch (setErr) {
             console.error("Failed to initialize methods:", setErr);
             setMethods([]);
@@ -141,6 +145,10 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
 
     fetchDeploymentData();
   }, [username, agentname, deploymentid, router]);
+
+  // methods stateが MethodListItemDTO[] なので、DeploymentMethodsCardに渡す前に文字列配列に変換
+  const methodNames: string[] = methods.map(m => m.name); // ★★★ 修正4: nameプロパティを取り出す ★★★
+
 
   if (isLoading) {
     return (
@@ -195,7 +203,8 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         <div className="lg:col-span-2">
           <DeploymentDetailCard deployment={deployment} />
         </div>
-        <DeploymentMethodsCard methods={methods} />
+        {/* ★★★ 修正5: 文字列配列に変換した methodNames を渡す ★★★ */}
+        <DeploymentMethodsCard methods={methodNames} />
       </div>
 
       <DeploymentTestCard deploymentId={String(deployment.id)} />

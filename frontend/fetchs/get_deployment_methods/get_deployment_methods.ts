@@ -3,24 +3,33 @@
 import { API_URL } from "../config";
 
 // ======================================
-// リクエストデータ型 (なし)
+// リクエストデータ型
 // ======================================
-// このAPIはリクエストボディを必要としません。
-// job_id は URL パスパラメータとして送信します。
-export interface GetDeploymentMethodsRequest {
-  // (Empty)
+export interface GetDeploymentMethodsRequest {}
+
+// ======================================
+// 内部DTO
+// ======================================
+export interface MethodListItemDTO {
+  /**
+   * メソッド名（機能の文字列）
+   */
+  name: string;
 }
 
 // ======================================
-// レスポンスデータ型 (バックエンドの Output DTO に対応)
+// レスポンスデータ型
 // ======================================
-// (Python: GetDeploymentMethodsOutput(methods=methods))
 export interface GetDeploymentMethodsResponse {
   /**
-   * C++エンジンが現在ロードしているメソッド（機能）の文字列リスト
-   * (例: ["Optimize the route", "Provide safety and emergency support"])
+   * 処理されたデプロイメントのID
    */
-  methods: string[];
+  deployment_id: number;
+  
+  /**
+   * DBに保存されているメソッド（機能）のリスト
+   */
+  methods: MethodListItemDTO[];
 }
 
 // ======================================
@@ -35,36 +44,31 @@ interface ApiError {
 // ======================================
 
 /**
- * 特定のジョブIDに紐づくC++エンジンに問い合わせ、
- * 現在ロードされているメソッド（機能）の一覧を取得する。
+ * 特定のジョブIDに紐づくデプロイメントのメソッド設定をDBから取得する。
  * @param jobId - 対象の Finetuning Job ID (URLパスパラメータ)
  * @param token - ユーザー認証トークン
- * @returns ロードされているメソッドの文字列リスト
+ * @returns デプロイメントIDとメソッドのリスト
  */
 export async function getDeploymentMethods(
   jobId: number,
   token: string
 ): Promise<GetDeploymentMethodsResponse> {
-  // GET /v1/jobs/{job_id}/methods エンドポイント
   const url = `${API_URL}/v1/jobs/${jobId}/methods`;
 
   try {
     const response = await fetch(url, {
-      method: "GET", // ★ GETリクエスト
+      method: "GET",
       headers: {
         "Authorization": `Bearer ${token}`,
         "Content-Type": "application/json",
       },
-      // body: (GETリクエストのためボディなし)
     });
 
     if (!response.ok) {
-      // エラーレスポンスをJSONとしてパース (400, 401, 404 など)
       const errorData: ApiError = await response.json();
       throw new Error(errorData.error || `HTTP error! status: ${response.status} ${response.statusText}`);
     }
     
-    // 成功レスポンス (200 OK) をパース
     return await response.json() as GetDeploymentMethodsResponse;
 
   } catch (error) {
