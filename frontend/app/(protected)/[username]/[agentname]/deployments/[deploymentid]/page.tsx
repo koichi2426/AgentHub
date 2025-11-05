@@ -7,10 +7,15 @@ import Cookies from "js-cookie";
 // Fetch 関連
 import { getUser } from "@/fetchs/get_user/get_user";
 import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
-import { getUserFinetuningJobs, FinetuningJobListItem } from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
+
+// ★★★ 修正1: 既存の fetcher を新しいものに置き換え ★★★
+import { getAgentFinetuningJobs } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
+import type { FinetuningJobListItem } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; // ★ 型のインポート元も変更
+
 import { getFinetuningJobDeployment, GetFinetuningJobDeploymentResponse } from "@/fetchs/get_finetuning_job_deployment/get_finetuning_job_deployment";
 import { createFinetuningJobDeployment } from "@/fetchs/create_finetuning_job_deployment/create_finetuning_job_deployment";
-// ★★★ 修正箇所1: 型のインポートを修正 ★★★
+
+// ★★★ 修正2: メソッド関連の型インポートを維持 ★★★
 import { getDeploymentMethods, MethodListItemDTO } from "@/fetchs/get_deployment_methods/get_deployment_methods"; 
 import { setDeploymentMethods } from "@/fetchs/set_deployment_methods/set_deployment_methods"; 
 
@@ -39,7 +44,7 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
   const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
   const [deploymentData, setDeploymentData] = useState<GetFinetuningJobDeploymentResponse | null>(null);
-  // ★★★ 修正箇所2: methodsの状態を MethodListItemDTO[] に変更 ★★★
+  // methods stateは MethodListItemDTO[] で正しい
   const [methods, setMethods] = useState<MethodListItemDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -65,20 +70,25 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         setUser(currentUser);
 
         // --- Step 1: Agent & Job 確認 ---
-        const [agentsRes, jobsRes] = await Promise.all([
+        const [agentsRes] = await Promise.all([
           getUserAgents(token),
-          getUserFinetuningJobs(token),
         ]);
 
+        const foundAgent = agentsRes.agents.find(
+          (a) => a.owner.toLowerCase() === username.toLowerCase() &&
+                 a.name.toLowerCase() === agentname.toLowerCase()
+        );
+        if (!foundAgent) notFound();
+
+        // ★★★ 修正3: Agent IDを使ってジョブ一覧を取得 ★★★
+        const jobsRes = await getAgentFinetuningJobs(foundAgent.id, token);
+        
+        // ★★★ 修正4: Agentに紐づくジョブリストから deploymentid と一致するものを探す ★★★
         const foundJob = jobsRes.jobs.find(
           (j) => Number(j.id) === Number(deploymentid)
         );
         if (!foundJob) notFound();
-
-        const foundAgent = agentsRes.agents.find(
-          (a) => Number(a.id) === Number(foundJob!.agent_id)
-        );
-        if (!foundAgent) notFound();
+        // ★★★ 修正ここまで ★★★
 
         if (
           foundAgent.owner.toLowerCase() !== username.toLowerCase() ||
@@ -121,13 +131,13 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         // --- Step 3: メソッド一覧取得 ---
         try {
           const methodsRes = await getDeploymentMethods(Number(foundJob.id), token);
-          setMethods(methodsRes.methods); // ★★★ 修正3: methodsRes.methods は既に MethodListItemDTO[] ★★★
+          setMethods(methodsRes.methods); 
         } catch (err) {
           console.warn("WARN: getDeploymentMethods failed, initializing defaults...");
           try {
             const setRes = await setDeploymentMethods(Number(foundJob.id), token);
             console.info("Default methods initialized:", setRes.methods);
-            setMethods(setRes.methods); // ★★★ 修正3: setRes.methods は既に MethodListItemDTO[] ★★★
+            setMethods(setRes.methods); 
           } catch (setErr) {
             console.error("Failed to initialize methods:", setErr);
             setMethods([]);
@@ -147,7 +157,7 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   }, [username, agentname, deploymentid, router]);
 
   // methods stateが MethodListItemDTO[] なので、DeploymentMethodsCardに渡す前に文字列配列に変換
-  const methodNames: string[] = methods.map(m => m.name); // ★★★ 修正4: nameプロパティを取り出す ★★★
+  const methodNames: string[] = methods.map(m => m.name); // nameプロパティを取り出す
 
 
   if (isLoading) {
@@ -203,7 +213,6 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         <div className="lg:col-span-2">
           <DeploymentDetailCard deployment={deployment} />
         </div>
-        {/* ★★★ 修正5: 文字列配列に変換した methodNames を渡す ★★★ */}
         <DeploymentMethodsCard methods={methodNames} />
       </div>
 

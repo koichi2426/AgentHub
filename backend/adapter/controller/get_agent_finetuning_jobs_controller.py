@@ -1,41 +1,43 @@
 from typing import Dict, Union, Any, List
 
 # ユースケース層の依存関係をインポート
-from usecase.get_user_finetuning_jobs import (
-    GetUserFinetuningJobsUseCase,
-    GetUserFinetuningJobsInput,
-    GetUserFinetuningJobsOutput,
+from usecase.get_agent_finetuning_jobs import (
+    GetAgentFinetuningJobsUseCase, # ★ クラス名を修正
+    GetAgentFinetuningJobsInput,   # ★ クラス名を修正
+    GetAgentFinetuningJobsOutput,  # ★ クラス名を修正
 )
 
 
-class GetUserFinetuningJobsController:
+class GetAgentFinetuningJobsController: # ★ クラス名を修正
     """
-    特定ユーザーのファインチューニングジョブ一覧取得リクエストを処理し、ユースケースに委譲するコントローラ。
+    特定Agentのファインチューニングジョブ一覧取得リクエストを処理し、ユースケースに委譲するコントローラ。
     """
-    def __init__(self, uc: GetUserFinetuningJobsUseCase):
+    def __init__(self, uc: GetAgentFinetuningJobsUseCase):
         """
         依存性注入によりユースケースインスタンスを受け取る。
         """
         self.uc = uc
 
     def execute(
-        self, token: str
-    ) -> Dict[str, Union[int, GetUserFinetuningJobsOutput, Dict[str, str]]]:
+        self, token: str, agent_id: int # ★ 修正: agent_id を引数に追加
+    ) -> Dict[str, Union[int, GetAgentFinetuningJobsOutput, Dict[str, str]]]: # ★ Outputクラス名を修正
         """
-        リクエストデータ（トークン）をユースケースのInputに変換し、実行結果をHTTP形式で返す。
+        リクエストデータ（トークンとagent_id）をユースケースのInputに変換し、実行結果をHTTP形式で返す。
         
         Args:
             token: ユーザーを認証するためのトークン文字列。
+            agent_id: 対象のAgent ID。
             
         Returns:
             Dict: HTTPステータスコードと結果データ（Output DTOまたはエラーメッセージ）を含む辞書。
         """
         # 1. Input DTOの生成
-        input_data = GetUserFinetuningJobsInput(token=token)
+        # ★ 修正: agent_id を Input DTO に渡す ★
+        input_data = GetAgentFinetuningJobsInput(token=token, agent_id=agent_id)
         
         try:
             # 2. ユースケースの実行
-            output: GetUserFinetuningJobsOutput
+            output: GetAgentFinetuningJobsOutput # ★ クラス名を修正
             err: Exception | None
             
             output, err = self.uc.execute(input_data)

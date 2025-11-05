@@ -5,17 +5,19 @@ from typing import Protocol, Tuple, Optional, List, Any
 # ドメイン層の依存関係
 from domain.entities.finetuning_job import FinetuningJob, FinetuningJobRepository 
 from domain.entities.user import User  
+from domain.entities.agent import Agent, AgentRepository 
+from domain.value_objects.id import ID 
 from domain.services.auth_domain_service import AuthDomainService
 
 
 # ======================================
 # Usecaseのインターフェース定義
 # ======================================
-class GetUserFinetuningJobsUseCase(Protocol):
-    """特定のユーザーが所有する全てのエージェントのファインチューニングジョブを取得するユースケースのインターフェース"""
+class GetAgentFinetuningJobsUseCase(Protocol):
+    """特定のAgentに紐づくファインチューニングジョブ一覧を取得するユースケースのインターフェース"""
     def execute(
-        self, input: "GetUserFinetuningJobsInput"
-    ) -> Tuple["GetUserFinetuningJobsOutput", Exception | None]:
+        self, input: "GetAgentFinetuningJobsInput"
+    ) -> Tuple["GetAgentFinetuningJobsOutput", Exception | None]:
         ...
 
 
@@ -23,9 +25,10 @@ class GetUserFinetuningJobsUseCase(Protocol):
 # UsecaseのInput
 # ======================================
 @dataclass
-class GetUserFinetuningJobsInput:
-    """ユーザーを特定するための認証トークン"""
+class GetAgentFinetuningJobsInput:
+    """ユーザーを特定するための認証トークンと、対象AgentのID"""
     token: str
+    agent_id: int 
 
 
 # ======================================
@@ -46,7 +49,7 @@ class FinetuningJobListItem:
 # Output DTO (全体)
 # ======================================
 @dataclass
-class GetUserFinetuningJobsOutput:
+class GetAgentFinetuningJobsOutput:
     """ジョブのリストを含む最終的なOutput DTO"""
     jobs: List[FinetuningJobListItem]
 
@@ -54,42 +57,57 @@ class GetUserFinetuningJobsOutput:
 # ======================================
 # Presenterのインターフェース定義
 # ======================================
-class GetUserFinetuningJobsPresenter(abc.ABC):
+class GetAgentFinetuningJobsPresenter(abc.ABC):
     """ドメインエンティティのリストをOutput DTOに変換するPresenter"""
     @abc.abstractmethod
-    def output(self, jobs: List[FinetuningJob]) -> GetUserFinetuningJobsOutput:
+    def output(self, jobs: List[FinetuningJob]) -> GetAgentFinetuningJobsOutput:
         pass
 
 
 # ======================================
 # Usecaseの具体的な実装 (Interactor)
 # ======================================
-class GetUserFinetuningJobsInteractor:
+class GetAgentFinetuningJobsInteractor:
     def __init__(
         self,
-        presenter: "GetUserFinetuningJobsPresenter",
-        job_repo: FinetuningJobRepository, # FinetuningJobRepositoryを使用
+        presenter: "GetAgentFinetuningJobsPresenter",
+        job_repo: FinetuningJobRepository,
         auth_service: AuthDomainService,
+        agent_repo: AgentRepository,
     ):
         self.presenter = presenter
         self.job_repo = job_repo
         self.auth_service = auth_service
+        self.agent_repo = agent_repo
 
     def execute(
-        self, input: GetUserFinetuningJobsInput
-    ) -> Tuple["GetUserFinetuningJobsOutput", Exception | None]:
+        self, input: GetAgentFinetuningJobsInput
+    ) -> Tuple["GetAgentFinetuningJobsOutput", Exception | None]:
         
-        empty_output = GetUserFinetuningJobsOutput(jobs=[])
+        empty_output = GetAgentFinetuningJobsOutput(jobs=[])
         
         try:
             # 1. トークンを検証してユーザー情報を取得
             user: User = self.auth_service.verify_token(input.token)
+            agent_id_vo = ID(input.agent_id)
             
-            # 2. JobRepositoryから特定の user_id に紐づく全てのジョブを取得
-            # FinetuningJobRepository に list_all_by_user メソッドが存在することを前提とする
-            jobs_list: List[FinetuningJob] = self.job_repo.list_all_by_user(user.id)
+            # 2. 権限チェック: このAgentをユーザーが所有しているか確認
+            agent: Optional[Agent] = self.agent_repo.find_by_id(agent_id_vo)
             
-            # 3. Presenterに渡してOutput DTOに変換
+            if agent is None:
+                raise FileNotFoundError(f"Agent {input.agent_id} not found.")
+
+            if agent.user_id != user.id:
+                raise PermissionError(
+                    "User does not have permission to access this agent's jobs."
+                )
+            
+            # 3. JobRepositoryから特定の agent_id に紐づく全てのジョブを取得
+            # ⬇️⬇️⬇️ 修正箇所：メソッド名を 'list_by_agent' に修正 ⬇️⬇️⬇️
+            jobs_list: List[FinetuningJob] = self.job_repo.list_by_agent(agent_id_vo)
+            # ⬆️⬆️⬆️ 修正箇所 ⬆️⬆️⬆️
+            
+            # 4. Presenterに渡してOutput DTOに変換
             output = self.presenter.output(jobs_list)
             return output, None
             
@@ -102,13 +120,15 @@ class GetUserFinetuningJobsInteractor:
 # ======================================
 # Usecaseインスタンスを生成するファクトリ関数
 # ======================================
-def new_get_user_finetuning_jobs_interactor(
-    presenter: "GetUserFinetuningJobsPresenter",
+def new_get_agent_finetuning_jobs_interactor(
+    presenter: "GetAgentFinetuningJobsPresenter",
     job_repo: FinetuningJobRepository,
     auth_service: AuthDomainService,
-) -> "GetUserFinetuningJobsUseCase":
-    return GetUserFinetuningJobsInteractor(
+    agent_repo: AgentRepository,
+) -> "GetAgentFinetuningJobsUseCase":
+    return GetAgentFinetuningJobsInteractor(
         presenter=presenter,
         job_repo=job_repo,
         auth_service=auth_service,
+        agent_repo=agent_repo,
     )
