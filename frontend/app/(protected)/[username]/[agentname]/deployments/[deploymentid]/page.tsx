@@ -8,16 +8,14 @@ import Cookies from "js-cookie";
 import { getUser } from "@/fetchs/get_user/get_user";
 import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
 
-// ★ 修正1: Agent Finetuning Jobs fetcherに置き換え
+// Agent Finetuning Jobs fetcher
 import { getAgentFinetuningJobs } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
 import type { FinetuningJobListItem } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
 
 import { getFinetuningJobDeployment, GetFinetuningJobDeploymentResponse } from "@/fetchs/get_finetuning_job_deployment/get_finetuning_job_deployment";
-// import { createFinetuningJobDeployment } from "@/fetchs/create_finetuning_job_deployment/create_finetuning_job_deployment"; // ★ 削除
 
-// ★ 修正2: メソッド関連の型インポートを維持
+// メソッド関連の型インポート
 import { getDeploymentMethods, MethodListItemDTO } from "@/fetchs/get_deployment_methods/get_deployment_methods"; 
-import { setDeploymentMethods } from "@/fetchs/set_deployment_methods/set_deployment_methods"; 
 
 // UIコンポーネント
 import DeploymentBreadcrumb from "@/components/deployments/DeploymentBreadcrumb";
@@ -44,7 +42,7 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
   const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
   const [deploymentData, setDeploymentData] = useState<GetFinetuningJobDeploymentResponse | null>(null);
-  const [methods, setMethods] = useState<MethodListItemDTO[]>([]); // MethodListItemDTO[]
+  const [methods, setMethods] = useState<MethodListItemDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -96,7 +94,7 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         setAgentData(foundAgent);
         setJobData(foundJob);
 
-        // --- Step 2: デプロイメント取得 (自動作成ロジックは削除済み) ---
+        // --- Step 2: デプロイメント取得 ---
         let deployment: GetFinetuningJobDeploymentResponse | null = null;
         try {
           // デプロイメントが存在しない場合はここでエラーがスローされる想定
@@ -114,16 +112,8 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
           const methodsRes = await getDeploymentMethods(Number(foundJob.id), token);
           setMethods(methodsRes.methods); 
         } catch (err) {
-          console.warn("WARN: getDeploymentMethods failed, initializing defaults...");
-          try {
-            // setDeploymentMethods は PUT メソッドであり、存在しない場合は作成（初期化）する
-            const setRes = await setDeploymentMethods(Number(foundJob.id), token);
-            console.info("Default methods initialized:", setRes.methods);
-            setMethods(setRes.methods); 
-          } catch (setErr) {
-            console.error("Failed to initialize methods:", setErr);
-            setMethods([]);
-          }
+          console.warn("WARN: getDeploymentMethods failed, assuming empty list.");
+          setMethods([]); 
         }
       } catch (e: unknown) {
         console.error("Failed to fetch deployment data:", e);
@@ -159,7 +149,6 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   }
 
   if (!user || !agentData || !deploymentData) {
-    // データがない場合は強制的に notFound (通常は上記の catch で処理される)
     notFound(); 
     return null;
   }
