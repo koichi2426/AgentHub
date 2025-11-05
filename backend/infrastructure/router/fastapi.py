@@ -437,7 +437,7 @@ def get_methods(
     credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
 ):
     """
-    デプロイされたC++エンジンから、現在ロードされているメソッド（機能）の一覧を取得する。
+    DBに保存されているメソッド（機能）の一覧を取得する。（仕様変更済み）
     """
     try:
         token = credentials.credentials
@@ -445,13 +445,17 @@ def get_methods(
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_get_deployment_methods_presenter()
         
+        # ⬇️⬇️⬇️ 修正箇所：DIを変更（リポジトリから取得） ⬇️⬇️⬇️
         usecase = new_get_deployment_methods_interactor(
             presenter=presenter,
-            job_method_finder_service=job_method_finder_service, # ★ HTTPクライアントサービス
+            methods_repo=methods_repo,    # ← DBから読み込むためのリポジトリを追加
+            deployment_repo=deployment_repo, # ← Deployment ID取得のためのリポジトリを追加
             job_repo=finetuning_job_repo, # 権限チェック用
             agent_repo=agent_repo,        # 権限チェック用
             auth_service=auth_service
         )
+        # ⬆️⬆️⬆️ 修正箇所：DIを変更 ⬆️⬆️⬆️
+        
         controller = GetDeploymentMethodsController(usecase)
         response_dict = controller.execute(input_data=input_data)
         return handle_response(response_dict, success_code=200)

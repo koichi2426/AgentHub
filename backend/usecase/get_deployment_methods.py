@@ -7,9 +7,13 @@ from domain.entities.finetuning_job import FinetuningJobRepository
 from domain.entities.agent import AgentRepository
 from domain.entities.user import User
 from domain.services.auth_domain_service import AuthDomainService
-from domain.services.job_method_finder_domain_service import JobMethodFinderDomainService # HTTPサービス
+from domain.services.job_method_finder_domain_service import JobMethodFinderDomainService 
 from domain.value_objects.id import ID
 from domain.value_objects.method import Method
+
+# ★★★ 修正箇所1: メソッドとデプロイメントのリポジトリをインポート ★★★
+from domain.entities.deployment import Deployment, DeploymentRepository
+from domain.entities.methods import DeploymentMethods, DeploymentMethodsRepository
 
 
 # ======================================
@@ -29,15 +33,21 @@ class GetDeploymentMethodsUseCase(Protocol):
 class GetDeploymentMethodsInput:
     """認証トークンと、メソッドを取得する対象のJob ID"""
     token: str
-    job_id: int  # ★ 修正: job_id を追加
+    job_id: int
 
 
 # ======================================
-# Output DTO
+# Output DTO (Presenterと整合させるために追加)
 # ======================================
 @dataclass
+class MethodListItemDTO:
+    """メソッド一覧表示用のDTO"""
+    name: str
+
+@dataclass
 class GetDeploymentMethodsOutput:
-    methods: List[str]
+    # Presenterと整合させるため、内部DTOのリストを持つ
+    methods: List[MethodListItemDTO]
 
 
 # ======================================
@@ -45,7 +55,8 @@ class GetDeploymentMethodsOutput:
 # ======================================
 class GetDeploymentMethodsPresenter(abc.ABC):
     @abc.abstractmethod
-    def output(self, methods: List[str]) -> GetDeploymentMethodsOutput:
+    # PresenterはValue Objectのリストを受け取り、Output DTOに変換する
+    def output(self, methods: List[Method]) -> GetDeploymentMethodsOutput:
         pass
 
 
@@ -56,13 +67,23 @@ class GetDeploymentMethodsInteractor:
     def __init__(
         self,
         presenter: "GetDeploymentMethodsPresenter",
-        job_method_finder_service: JobMethodFinderDomainService,
+        # 修正2a: HTTPサービスを削除
+        # job_method_finder_service: JobMethodFinderDomainService,
+        
+        # 修正2b: メソッドリポジトリとデプロイメントリポジトリを追加
+        methods_repo: DeploymentMethodsRepository,
+        deployment_repo: DeploymentRepository,
+        
         job_repo: FinetuningJobRepository,
         agent_repo: AgentRepository,
         auth_service: AuthDomainService,
     ):
         self.presenter = presenter
-        self.job_method_finder_service = job_method_finder_service
+        # self.job_method_finder_service = job_method_finder_service # 削除
+        
+        self.methods_repo = methods_repo # 追加
+        self.deployment_repo = deployment_repo # 追加
+        
         self.job_repo = job_repo
         self.agent_repo = agent_repo
         self.auth_service = auth_service
@@ -90,15 +111,24 @@ class GetDeploymentMethodsInteractor:
                     "User does not have permission to view methods for this job."
                 )
 
-            # 3. ロジック本体: C++エンジンからメソッドを取得
-            # job_method_finder_service は HTTP クライアントとして動作
-            method_vos: List[Method] = self.job_method_finder_service.find_methods_by_job_id(job_id_vo)
+            # ★★★ 修正3: ロジック本体 - リポジトリから取得 ★★★
             
-            # 4. Presenterに渡すために文字列リストに変換
-            method_names = [vo.name for vo in method_vos]
+            # 3a. デプロイメントIDを取得 (Setのロジックを流用)
+            deployment: Optional[Deployment] = self.deployment_repo.find_by_job_id(job_id_vo)
             
-            # 5. Presenterに渡してOutput DTOに変換
-            output = self.presenter.output(method_names)
+            if deployment is None:
+                method_vos = [] # デプロイメントがない場合はメソッドもない
+            else:
+                # 3b. デプロイメントIDからメソッドエンティティを取得
+                methods_entity: Optional[DeploymentMethods] = self.methods_repo.find_by_deployment_id(deployment.id)
+
+                if methods_entity is None:
+                    method_vos = [] # 設定がない場合は空
+                else:
+                    method_vos = methods_entity.methods # Value Objectのリストを取得
+
+            # 4. Presenterに Value Object のリストを渡す
+            output = self.presenter.output(method_vos) 
             return output, None
             
         except Exception as e:
@@ -112,14 +142,24 @@ class GetDeploymentMethodsInteractor:
 # ======================================
 def new_get_deployment_methods_interactor(
     presenter: "GetDeploymentMethodsPresenter",
-    job_method_finder_service: JobMethodFinderDomainService,
+    # 修正4a: HTTPサービスを削除
+    # job_method_finder_service: JobMethodFinderDomainService,
+    
+    # 修正4b: メソッドリポジトリとデプロイメントリポジトリを追加
+    methods_repo: DeploymentMethodsRepository,
+    deployment_repo: DeploymentRepository,
+    
     job_repo: FinetuningJobRepository,
     agent_repo: AgentRepository,
     auth_service: AuthDomainService,
 ) -> "GetDeploymentMethodsUseCase":
     return GetDeploymentMethodsInteractor(
         presenter=presenter,
-        job_method_finder_service=job_method_finder_service,
+        # job_method_finder_service=job_method_finder_service, # 削除
+        
+        methods_repo=methods_repo, # 追加
+        deployment_repo=deployment_repo, # 追加
+        
         job_repo=job_repo,
         agent_repo=agent_repo,
         auth_service=auth_service,
