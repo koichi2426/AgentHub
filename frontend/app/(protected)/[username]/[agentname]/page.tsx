@@ -11,18 +11,24 @@ import { getUser, GetUserResponse } from "@/fetchs/get_user/get_user";
 import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
 import Cookies from "js-cookie";
 
-// ▼▼▼ [修正] Finetuning Jobs Fetcherと型をインポート ★★★ ▼▼▼
+// ▼▼▼ Finetuning Jobs Fetcherと型をインポート ▼▼▼
 import { 
   getAgentFinetuningJobs, 
   FinetuningJobListItem, 
 } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
-// ▲▲▲ 修正ここまで ★★★ ▲▲▲
+// ▲▲▲ Finetuning Jobs Fetcherと型をインポート ▲▲▲
 
-// ★★★ 修正1: Get Agent Deployments Fetcherと型をインポート ★★★
+// ★★★ Deployments Fetcherと型をインポート ★★★
 import { 
     getAgentDeployments, 
     DeploymentListItem, 
 } from "@/fetchs/get_agent_deployments/get_agent_deployments";
+
+// ★★★ createFinetuningJobDeployment をインポート ★★★
+import { 
+    createFinetuningJobDeployment, 
+    // CreateFinetuningJobDeploymentResponse は内部で使用
+} from "@/fetchs/create_finetuning_job_deployment/create_finetuning_job_deployment";
 
 import AgentTabFineTuning from "@/components/agent-tabs/agent-tab-finetuning";
 import AgentTabDeployments from "@/components/agent-tabs/agent-tab-deployments";
@@ -46,7 +52,6 @@ export default function AgentPage({
   const [user, setUser] = useState<GetUserResponse | null>(null);
   const [agent, setAgent] = useState<AgentListItem | null>(null);
   const [finetuningJobs, setFinetuningJobs] = useState<FinetuningJobListItem[]>([]);
-  // ★★★ 修正2: Deployments の State を追加 ★★★
   const [agentDeployments, setAgentDeployments] = useState<DeploymentListItem[]>([]);
   
   const [isLoading, setIsLoading] = useState(true);
@@ -61,16 +66,17 @@ export default function AgentPage({
       }
 
       try {
-        // ... (省略: ユーザーとエージェントの取得・チェックロジック) ...
-        const currentUser = await getUser(token);
+        // 1. ユーザー情報とエージェント一覧を取得・チェック
+        const [currentUser, agentsResponse] = await Promise.all([
+            getUser(token),
+            getUserAgents(token),
+        ]);
 
         if (currentUser.username.toLowerCase() !== username.toLowerCase()) {
           notFound();
           return;
         }
         setUser(currentUser);
-
-        const agentsResponse = await getUserAgents(token);
         
         const foundAgent = agentsResponse.agents.find(
           (a) =>
@@ -85,18 +91,71 @@ export default function AgentPage({
 
         setAgent(foundAgent);
 
-        // --- データ取得を並列化 ---
-        const [jobsResponse, deploymentsResponse] = await Promise.all([
-            getAgentFinetuningJobs(foundAgent.id, token), // Finetuning Jobs
-            getAgentDeployments(foundAgent.id, token),      // ★★★ 修正3: Deployments を取得 ★★★
-        ]);
+        // --- データ取得ロジック ---
+        // 1. ジョブ一覧は常に取得
+        const jobsResponse = await getAgentFinetuningJobs(foundAgent.id, token);
+        const jobsList = jobsResponse.jobs;
+        setFinetuningJobs(jobsList);
         
-        setFinetuningJobs(jobsResponse.jobs);
-        setAgentDeployments(deploymentsResponse.deployments); // ★★★ 修正3: Stateにセット ★★★
-        // ... (省略: データ取得のロジックはここまで) ...
+        // 2. デプロイメント一覧を取得
+        let existingDeployments: DeploymentListItem[] = [];
+        try {
+            const deploymentsResponse = await getAgentDeployments(foundAgent.id, token);
+            existingDeployments = deploymentsResponse.deployments;
+        } catch (e) {
+            // デプロイメントが存在しない場合は空リストとして扱う（404を想定）
+            console.warn("WARN: Initial agent deployments fetch failed, assuming empty list.");
+        }
+        
+        // 3. ★★★ 差分を計算し、必要なデプロイメントを作成 ★★★
+        const existingJobIds = new Set(existingDeployments.map(d => d.job_id));
+        
+        // デプロイメントが存在しない「完了済み」ジョブを見つける
+        const jobsToDeploy = jobsList.filter(
+            // statusが 'completed' で、かつ Job IDが既存の Deployment の job_id リストにないもの
+            (job) => job.status === 'completed' && !existingJobIds.has(job.id)
+        );
+
+        let deploymentsToSet = existingDeployments; // Stateにセットするリストの初期値
+
+        if (jobsToDeploy.length > 0) {
+            console.info(`Found ${jobsToDeploy.length} completed jobs without deployments. Creating them now...`);
+            
+            // 差分デプロイメントを並列で作成
+            const creationPromises = jobsToDeploy.map(job => 
+                createFinetuningJobDeployment(job.id, token)
+            );
+            
+            const newDeploymentResponses = await Promise.allSettled(creationPromises);
+            
+            const newlyCreatedDeployments: DeploymentListItem[] = [];
+            
+            newDeploymentResponses.forEach(result => {
+                if (result.status === 'fulfilled') {
+                    const created = result.value.deployment;
+                    // 作成された単一のデプロイメントをリスト形式に変換して追加
+                    newlyCreatedDeployments.push({
+                        id: created.id,
+                        job_id: created.job_id,
+                        status: created.status,
+                        endpoint: created.endpoint,
+                    });
+                } else {
+                    console.error("❌ Failed to create one deployment:", result.reason);
+                }
+            });
+            
+            // 既存のものと新しく作成されたものを結合
+            deploymentsToSet = [...existingDeployments, ...newlyCreatedDeployments];
+        } 
+        
+        // 4. Stateにセット
+        setAgentDeployments(deploymentsToSet);
+        // ▲▲▲ 修正ここまで ★★★ ▲▲▲
 
       } catch (e) {
         console.error("Failed to fetch agent data:", e);
+        // エージェント情報だけでなく、ジョブ情報取得失敗もキャッチ
         setError("Failed to load agent or job details. Please check your network or token.");
       } finally {
         setIsLoading(false);
@@ -137,7 +196,7 @@ export default function AgentPage({
   // --- ジョブデータを下流コンポーネメントの型に合わせる ---
   const agentJobsCasted = finetuningJobs as unknown as FinetuningJob[]; 
   
-  // ★★★ 修正4: デプロイメントデータを下流コンポーネントの型に合わせる ★★★
+  // デプロイメントデータを下流コンポーネントの型に合わせる
   const deploymentsCasted = agentDeployments as unknown as Deployment[]; 
 
   // --- JSX 出力 ---
@@ -179,7 +238,6 @@ export default function AgentPage({
 
         {/* --- Deployments タブ --- */}
         <TabsContent value="api" className="mt-6">
-          {/* ★★★ 修正5: 取得したデプロイメントデータを渡す ★★★ */}
           <AgentTabDeployments 
             deployments={deploymentsCasted} 
             username={user.username} 

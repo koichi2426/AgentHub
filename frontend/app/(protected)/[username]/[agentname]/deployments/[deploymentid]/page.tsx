@@ -8,14 +8,14 @@ import Cookies from "js-cookie";
 import { getUser } from "@/fetchs/get_user/get_user";
 import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
 
-// ★★★ 修正1: 既存の fetcher を新しいものに置き換え ★★★
+// ★ 修正1: Agent Finetuning Jobs fetcherに置き換え
 import { getAgentFinetuningJobs } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
-import type { FinetuningJobListItem } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; // ★ 型のインポート元も変更
+import type { FinetuningJobListItem } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
 
 import { getFinetuningJobDeployment, GetFinetuningJobDeploymentResponse } from "@/fetchs/get_finetuning_job_deployment/get_finetuning_job_deployment";
-import { createFinetuningJobDeployment } from "@/fetchs/create_finetuning_job_deployment/create_finetuning_job_deployment";
+// import { createFinetuningJobDeployment } from "@/fetchs/create_finetuning_job_deployment/create_finetuning_job_deployment"; // ★ 削除
 
-// ★★★ 修正2: メソッド関連の型インポートを維持 ★★★
+// ★ 修正2: メソッド関連の型インポートを維持
 import { getDeploymentMethods, MethodListItemDTO } from "@/fetchs/get_deployment_methods/get_deployment_methods"; 
 import { setDeploymentMethods } from "@/fetchs/set_deployment_methods/set_deployment_methods"; 
 
@@ -44,8 +44,7 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
   const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
   const [deploymentData, setDeploymentData] = useState<GetFinetuningJobDeploymentResponse | null>(null);
-  // methods stateは MethodListItemDTO[] で正しい
-  const [methods, setMethods] = useState<MethodListItemDTO[]>([]);
+  const [methods, setMethods] = useState<MethodListItemDTO[]>([]); // MethodListItemDTO[]
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -70,25 +69,22 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         setUser(currentUser);
 
         // --- Step 1: Agent & Job 確認 ---
-        const [agentsRes] = await Promise.all([
-          getUserAgents(token),
-        ]);
-
+        const agentsRes = await getUserAgents(token);
+        
         const foundAgent = agentsRes.agents.find(
           (a) => a.owner.toLowerCase() === username.toLowerCase() &&
                  a.name.toLowerCase() === agentname.toLowerCase()
         );
         if (!foundAgent) notFound();
 
-        // ★★★ 修正3: Agent IDを使ってジョブ一覧を取得 ★★★
+        // Agent IDを使ってジョブ一覧を取得
         const jobsRes = await getAgentFinetuningJobs(foundAgent.id, token);
         
-        // ★★★ 修正4: Agentに紐づくジョブリストから deploymentid と一致するものを探す ★★★
+        // Agentに紐づくジョブリストから deploymentid と一致するものを探す
         const foundJob = jobsRes.jobs.find(
           (j) => Number(j.id) === Number(deploymentid)
         );
         if (!foundJob) notFound();
-        // ★★★ 修正ここまで ★★★
 
         if (
           foundAgent.owner.toLowerCase() !== username.toLowerCase() ||
@@ -100,32 +96,17 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         setAgentData(foundAgent);
         setJobData(foundJob);
 
-        // --- Step 2: デプロイメント取得 or 自動作成 ---
+        // --- Step 2: デプロイメント取得 (自動作成ロジックは削除済み) ---
         let deployment: GetFinetuningJobDeploymentResponse | null = null;
         try {
+          // デプロイメントが存在しない場合はここでエラーがスローされる想定
           deployment = await getFinetuningJobDeployment(Number(foundJob.id), token);
         } catch {
-          console.warn("WARN: Deployment not found, creating new one...");
+          // デプロイメントが存在しない場合は、ここでnotFound()
+          notFound(); 
+          return;
         }
-
-        if (!deployment) {
-          try {
-            const created = await createFinetuningJobDeployment(Number(foundJob.id), token);
-            // created.deployment は GetFinetuningJobDeploymentResponse と同じ構造ではないため、
-            // 必要なプロパティだけを抽出してキャストします
-            deployment = {
-              id: created.deployment.id,
-              finetuning_job_id: created.deployment.job_id,
-              status: created.deployment.status,
-              endpoint: created.deployment.endpoint,
-            } as GetFinetuningJobDeploymentResponse;
-            console.info("✅ Created new deployment:", deployment);
-          } catch (createErr) {
-            console.error("❌ Failed to create deployment:", createErr);
-            throw new Error("Deployment not found and failed to create automatically.");
-          }
-        }
-
+        
         setDeploymentData(deployment);
 
         // --- Step 3: メソッド一覧取得 ---
@@ -135,6 +116,7 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         } catch (err) {
           console.warn("WARN: getDeploymentMethods failed, initializing defaults...");
           try {
+            // setDeploymentMethods は PUT メソッドであり、存在しない場合は作成（初期化）する
             const setRes = await setDeploymentMethods(Number(foundJob.id), token);
             console.info("Default methods initialized:", setRes.methods);
             setMethods(setRes.methods); 
@@ -157,7 +139,7 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   }, [username, agentname, deploymentid, router]);
 
   // methods stateが MethodListItemDTO[] なので、DeploymentMethodsCardに渡す前に文字列配列に変換
-  const methodNames: string[] = methods.map(m => m.name); // nameプロパティを取り出す
+  const methodNames: string[] = methods.map(m => m.name);
 
 
   if (isLoading) {
@@ -177,7 +159,8 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   }
 
   if (!user || !agentData || !deploymentData) {
-    notFound();
+    // データがない場合は強制的に notFound (通常は上記の catch で処理される)
+    notFound(); 
     return null;
   }
 
