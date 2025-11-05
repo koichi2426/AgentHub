@@ -9,6 +9,7 @@ import { getUser } from "@/fetchs/get_user/get_user";
 import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
 import { getUserFinetuningJobs, FinetuningJobListItem } from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
 import { getFinetuningJobDeployment, GetFinetuningJobDeploymentResponse } from "@/fetchs/get_finetuning_job_deployment/get_finetuning_job_deployment";
+import { createFinetuningJobDeployment } from "@/fetchs/create_finetuning_job_deployment/create_finetuning_job_deployment";
 import { getDeploymentMethods } from "@/fetchs/get_deployment_methods/get_deployment_methods";
 import { setDeploymentMethods } from "@/fetchs/set_deployment_methods/set_deployment_methods";
 
@@ -87,16 +88,28 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         setAgentData(foundAgent);
         setJobData(foundJob);
 
-        // --- Step 2: デプロイ情報取得 ---
+        // --- Step 2: デプロイメント取得 or 自動作成 ---
         let deployment: GetFinetuningJobDeploymentResponse | null = null;
         try {
           deployment = await getFinetuningJobDeployment(Number(foundJob.id), token);
         } catch {
-          console.warn("WARN: Deployment not found.");
+          console.warn("WARN: Deployment not found, creating new one...");
         }
 
         if (!deployment) {
-          throw new Error("Deployment not found for this job.");
+          try {
+            const created = await createFinetuningJobDeployment(Number(foundJob.id), token);
+            deployment = {
+              id: created.deployment.id,
+              finetuning_job_id: created.deployment.job_id, // 型補完
+              status: created.deployment.status,
+              endpoint: created.deployment.endpoint,
+            } as GetFinetuningJobDeploymentResponse;
+            console.info("✅ Created new deployment:", deployment);
+          } catch (createErr) {
+            console.error("❌ Failed to create deployment:", createErr);
+            throw new Error("Deployment not found and failed to create automatically.");
+          }
         }
 
         setDeploymentData(deployment);
@@ -107,8 +120,6 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
           setMethods(methodsRes.methods);
         } catch (err) {
           console.warn("WARN: getDeploymentMethods failed, initializing defaults...");
-
-          // 🔁 新規：デフォルトメソッドを初期化
           try {
             const setRes = await setDeploymentMethods(Number(foundJob.id), token);
             console.info("Default methods initialized:", setRes.methods);
