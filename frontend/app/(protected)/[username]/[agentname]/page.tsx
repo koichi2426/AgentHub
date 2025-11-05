@@ -70,6 +70,8 @@ export default function AgentPage({
       }
 
       try {
+        console.log("--- DEBUG START: Fetching Agent Data ---");
+        
         // 1. ユーザー情報とエージェント一覧を取得・チェック
         const [currentUser, agentsResponse] = await Promise.all([
             getUser(token),
@@ -94,23 +96,29 @@ export default function AgentPage({
         }
 
         setAgent(foundAgent);
+        console.log(`[DEBUG] Found Agent ID: ${foundAgent.id}`);
+
 
         // --- データ取得ロジック ---
         // 1. ジョブ一覧は常に取得
         const jobsResponse = await getAgentFinetuningJobs(foundAgent.id, token);
         const jobsList = jobsResponse.jobs;
         setFinetuningJobs(jobsList);
+        console.log(`[DEBUG] Total Jobs Found: ${jobsList.length}`);
+        
         
         // 2. デプロイメント一覧を取得
         let existingDeployments: DeploymentListItem[] = [];
         try {
+            console.log("[DEBUG] 1/3. Attempting to fetch existing deployments...");
             const deploymentsResponse = await getAgentDeployments(foundAgent.id, token);
             existingDeployments = deploymentsResponse.deployments;
+            console.log(`[DEBUG] Found existing deployments: ${existingDeployments.length}`);
         } catch (e) {
-            console.warn("WARN: Initial agent deployments fetch failed, assuming empty list.");
+            console.warn("[DEBUG] WARN: getAgentDeployments failed (expected for 404/empty). Assuming empty list.");
         }
         
-        // 3. ★★★ 差分を計算し、必要なデプロイメントを作成 / メソッド設定（シンプル逐次処理） ★★★
+        // 3. ★★★ 差分を計算し、必要なデプロイメントを作成 / メソッド設定 ★★★
         const existingJobIds = new Set(existingDeployments.map(d => d.job_id));
         
         // デプロイメントが存在しない「完了済み」ジョブを見つける
@@ -118,25 +126,35 @@ export default function AgentPage({
             (job) => job.status === 'completed' && !existingJobIds.has(job.id)
         );
 
+        console.log(`[DEBUG] Existing Deployment Job IDs:`, existingJobIds);
+        console.log(`[DEBUG] Jobs to Deploy (completed & missing) count: ${jobsToDeploy.length}`);
+
+
         let deploymentsToSet = existingDeployments; 
 
         if (jobsToDeploy.length > 0) {
-            console.info(`Found ${jobsToDeploy.length} completed jobs without deployments. Creating/Setting methods sequentially...`);
+            console.info(`[INFO] Starting sequential setup for ${jobsToDeploy.length} jobs.`);
             
             const newlyCreatedDeployments: DeploymentListItem[] = [];
             
             // 修正：mapを使ってデプロイメント作成と設定を逐次実行
             const sequentialDeploymentAndSetup = jobsToDeploy.map(async job => {
+                
+                console.log(`[Job ${job.id}] DEBUG: Starting setup for Job ID: ${job.id}.`);
+                
                 try {
                     // 1. デプロイメントを作成
+                    console.log(`[Job ${job.id}] DEBUG: 1. Calling createFinetuningJobDeployment...`);
                     const created = await createFinetuningJobDeployment(job.id, token);
-                    console.info(`[Job ${job.id}] ✅ Deployment created.`);
+                    console.info(`[Job ${job.id}] ✅ Deployment created (New ID: ${created.deployment.id}).`);
 
                     // 2. そのデプロイメントにメソッドを設定
+                    console.log(`[Job ${job.id}] DEBUG: 2. Calling setDeploymentMethods for Job ID: ${created.deployment.job_id}...`);
                     await setDeploymentMethods(created.deployment.job_id, token);
-                    console.info(`[Job ${job.id}] ✅ Methods initialized.`);
+                    console.info(`[Job ${job.id}] ✅ Methods initialized successfully.`);
 
                     // 3. 成功したデプロイメント情報を返す
+                    console.log(`[Job ${job.id}] DEBUG: 3. Setup complete, returning item.`);
                     return {
                         id: created.deployment.id,
                         job_id: created.deployment.job_id,
@@ -146,8 +164,8 @@ export default function AgentPage({
 
                 } catch (e) {
                     // 作成または設定に失敗した場合
-                    console.error(`[Job ${job.id}] ❌ Failed to set up deployment:`, e);
-                    return null; // 失敗した場合は null を返す
+                    console.error(`[Job ${job.id}] ❌ FAILED during setup. Full Error:`, e); 
+                    return null; 
                 }
             });
             
@@ -163,11 +181,13 @@ export default function AgentPage({
             
             // 既存のものと新しく作成されたものを結合
             deploymentsToSet = [...existingDeployments, ...newlyCreatedDeployments];
+            console.log("[DEBUG] Deployment setup finished. Total deployments:", deploymentsToSet.length);
+        } else {
+            console.log("[DEBUG] No new deployments required.");
         } 
         
         // 4. Stateにセット
         setAgentDeployments(deploymentsToSet);
-        // ▲▲▲ 修正ここまで ★★★ ▲▲▲
 
       } catch (e: unknown) {
         console.error("Failed to fetch agent data:", e);
@@ -211,7 +231,7 @@ export default function AgentPage({
   const agentCasted = agent as unknown as Agent;
   const userCasted = user as unknown as User;
 
-  // --- ジョブデータを下流コンポーネメントの型に合わせる ---
+  // --- ジョブデータを下流コンポーネントの型に合わせる ---
   const agentJobsCasted = finetuningJobs as unknown as FinetuningJob[]; 
   
   // デプロイメントデータを下流コンポーネントの型に合わせる
