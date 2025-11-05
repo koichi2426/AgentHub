@@ -479,9 +479,8 @@ def set_methods(
     try:
         token = credentials.credentials
         input_data = SetDeploymentMethodsInput(
-            token=token, 
-            job_id=job_id, 
-            methods=request.methods
+            token=token,
+            job_id=job_id
         )
         auth_service = NewAuthDomainService(user_repo)
         presenter = new_set_deployment_methods_presenter()

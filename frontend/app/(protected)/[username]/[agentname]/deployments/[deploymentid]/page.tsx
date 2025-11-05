@@ -9,11 +9,8 @@ import { getUser } from "@/fetchs/get_user/get_user";
 import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
 import { getUserFinetuningJobs, FinetuningJobListItem } from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
 import { getFinetuningJobDeployment, GetFinetuningJobDeploymentResponse } from "@/fetchs/get_finetuning_job_deployment/get_finetuning_job_deployment";
-import {
-  setDeploymentMethods,
-  SetDeploymentMethodsRequest,
-} from "@/fetchs/set_deployment_methods/set_deployment_methods";
 import { getDeploymentMethods } from "@/fetchs/get_deployment_methods/get_deployment_methods";
+import { setDeploymentMethods } from "@/fetchs/set_deployment_methods/set_deployment_methods";
 
 // UIコンポーネント
 import DeploymentBreadcrumb from "@/components/deployments/DeploymentBreadcrumb";
@@ -58,12 +55,10 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
       try {
         // --- Step 0: 認証ユーザー取得 ---
         const currentUser = await getUser(token);
-
         if (currentUser.username.toLowerCase() !== username.toLowerCase()) {
           notFound();
           return;
         }
-
         setUser(currentUser);
 
         // --- Step 1: Agent & Job 確認 ---
@@ -72,7 +67,9 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
           getUserFinetuningJobs(token),
         ]);
 
-        const foundJob = jobsRes.jobs.find((j) => Number(j.id) === Number(deploymentid));
+        const foundJob = jobsRes.jobs.find(
+          (j) => Number(j.id) === Number(deploymentid)
+        );
         if (!foundJob) notFound();
 
         const foundAgent = agentsRes.agents.find(
@@ -95,31 +92,32 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         try {
           deployment = await getFinetuningJobDeployment(Number(foundJob.id), token);
         } catch {
-          console.warn("WARN: Deployment not found, creating new one...");
+          console.warn("WARN: Deployment not found.");
         }
 
-        // --- Step 3: 存在しない場合はデフォルトメソッドで作成 ---
         if (!deployment) {
-          const defaultMethods: string[] = [
-            "Optimize the route",
-            "Provide safety and emergency support",
-          ];
-          const setReq: SetDeploymentMethodsRequest = { methods: defaultMethods };
-          await setDeploymentMethods(setReq, Number(foundJob.id), token);
-          deployment = await getFinetuningJobDeployment(Number(foundJob.id), token);
+          throw new Error("Deployment not found for this job.");
         }
 
-        setDeploymentData(deployment!);
+        setDeploymentData(deployment);
 
-        // --- Step 4: メソッド一覧取得（別APIから） ---
+        // --- Step 3: メソッド一覧取得 ---
         try {
           const methodsRes = await getDeploymentMethods(Number(foundJob.id), token);
           setMethods(methodsRes.methods);
         } catch (err) {
-          console.warn("WARN: getDeploymentMethods failed, using defaults.");
-          setMethods(["Optimize the route", "Provide safety and emergency support"]);
-        }
+          console.warn("WARN: getDeploymentMethods failed, initializing defaults...");
 
+          // 🔁 新規：デフォルトメソッドを初期化
+          try {
+            const setRes = await setDeploymentMethods(Number(foundJob.id), token);
+            console.info("Default methods initialized:", setRes.methods);
+            setMethods(setRes.methods);
+          } catch (setErr) {
+            console.error("Failed to initialize methods:", setErr);
+            setMethods([]);
+          }
+        }
       } catch (e: unknown) {
         console.error("Failed to fetch deployment data:", e);
         let msg = "Failed to load deployment details.";
@@ -155,17 +153,17 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
   }
 
   const agent: Agent = {
-    id: agentData.id, // ✅ number型で統一
+    id: agentData.id,
     name: agentData.name,
     owner: agentData.owner,
-    description: agentData.description ?? "", // ✅ null安全
+    description: agentData.description ?? "",
   };
 
   const deployment: Deployment = {
-    id: deploymentData.id, // ✅ number型で統一
-    job_id: deploymentData.finetuning_job_id, // ✅ number型
+    id: deploymentData.id,
+    job_id: deploymentData.finetuning_job_id,
     status: deploymentData.status as "active" | "inactive",
-    endpoint: deploymentData.endpoint ?? "", // ✅ null安全
+    endpoint: deploymentData.endpoint ?? "",
   };
 
   const handleDeleteDeployment = () => {
