@@ -4,9 +4,10 @@ from typing import Protocol, Tuple, Optional, List
 
 # ドメイン層の依存関係
 # --- 今回必要になるリポジトリ群 ---
+# パスは仮定
 from domain.entities.deployment import Deployment, DeploymentRepository
 from domain.entities.finetuning_job import FinetuningJob, FinetuningJobRepository
-from domain.entities.agent import Agent, AgentRepository
+from domain.entities.agent import Agent, AgentRepository 
 # --- 認証サービスとエンティティ ---
 from domain.entities.user import User
 from domain.services.auth_domain_service import AuthDomainService
@@ -114,8 +115,8 @@ class GetFinetuningJobDeploymentInteractor:
             if agent is None:
                 raise FileNotFoundError(f"Agent {job.agent_id} (for job {job.id}) not found.")
             
-            # ▼▼▼ 修正箇所 ▼▼▼
-            if agent.owner_id != user.id:  # (Agentのowner_idもID VOであることを期待)
+            # Agentエンティティの定義に従い、user_id属性を使用
+            if agent.user_id != user.id:
                 raise PermissionError( # 標準のPermissionErrorを使用
                     "User does not have permission to access this job's deployment."
                 )

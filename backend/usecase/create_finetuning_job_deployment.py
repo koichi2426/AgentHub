@@ -1,4 +1,6 @@
 import abc
+import os  # ★ 環境変数を読み込む
+from urllib.parse import urljoin  # ★ URLを安全に結合する
 from dataclasses import dataclass
 from typing import Protocol, Tuple, Optional, List
 
@@ -46,7 +48,7 @@ class CreatedDeploymentDTO:
     id: int
     job_id: int
     status: str       # (例: "inactive")
-    endpoint: Optional[str] # (例: None)
+    endpoint: Optional[str] # (例: "http://...")
 
 
 # ======================================
@@ -85,6 +87,16 @@ class CreateFinetuningJobDeploymentInteractor:
         self.job_repo = job_repo
         self.agent_repo = agent_repo
         self.auth_service = auth_service
+        
+        # ★★★ START: 修正点 1 (環境変数の読み込み) ★★★
+        # C++エンジンのベースURLを環境変数から読み込む
+        base_url = os.environ.get("AGENTHUB_ENGINE_BASE_URL")
+        if not base_url:
+            raise ValueError("AGENTHUB_ENGINE_BASE_URL environment variable is not set.")
+        if not base_url.endswith('/'):
+            base_url += '/'
+        self.engine_base_url = base_url
+        # ★★★ END: 修正点 1 ★★★
 
     def execute(
         self, input: CreateFinetuningJobDeploymentInput
@@ -112,7 +124,8 @@ class CreateFinetuningJobDeploymentInteractor:
             if agent is None:
                 raise FileNotFoundError(f"Agent {job.agent_id} (for job {job.id}) not found.")
             
-            if agent.owner_id != user.id:
+            # 🚨 修正: Agentの`owner`ではなく`user_id`フィールドを参照
+            if agent.user_id != user.id:
                 raise PermissionError(
                     "User does not have permission to create a deployment for this job."
                 )
@@ -128,16 +141,23 @@ class CreateFinetuningJobDeploymentInteractor:
                     f"Deployment for job {input.job_id} already exists (ID: {existing_deployment.id})."
                 )
 
-            # 4b. 新しいデプロイメントエンティティを準備
+            # ★★★ START: 修正点 2 (エンドポイントの構築) ★★★
+            # 4b. エンドポイントURLを構築 (例: "http://.../job45/predict")
+            job_path = f"job{job_id_vo.value}/"
+            predict_endpoint_path = urljoin(job_path, "predict")
+            full_endpoint = urljoin(self.engine_base_url, predict_endpoint_path)
+            # ★★★ END: 修正点 2 ★★★
+
+            # 4c. 新しいデプロイメントエンティティを準備
             # (IDはリポジトリ(DB)側で採番されることを期待し、ダミーのID(0)をセット)
             new_deployment_data = Deployment(
                 id=ID(0), # 採番前ダミーID
                 job_id=job_id_vo,
                 status="inactive", # 新規作成時は「非アクティブ」
-                endpoint=None      # エンドポイントはまだ無い
+                endpoint=full_endpoint # ★★★ 修正点 3: None から構築したURLに変更 ★★★
             )
             
-            # 4c. リポジトリに作成を依頼
+            # 4d. リポジトリに作成を依頼
             created_deployment: Deployment = self.deployment_repo.create(new_deployment_data)
 
             # ▲▲▲ 新規ロジック ▲▲▲
@@ -164,6 +184,7 @@ def new_create_finetuning_job_deployment_interactor(
     agent_repo: AgentRepository,
     auth_service: AuthDomainService,
 ) -> "CreateFinetuningJobDeploymentUseCase":
+    # ★ 修正点 4: __init__ が環境変数を読むようになったため、ファクトリは引数を変更する必要なし
     return CreateFinetuningJobDeploymentInteractor(
         presenter=presenter,
         deployment_repo=deployment_repo,

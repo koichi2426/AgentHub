@@ -77,6 +77,10 @@ services:
       VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/AgentHubStorage/models}
       VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/AgentHubStorage/visualizations}
       # --- ▲ 修正完了 ▲ ---
+
+      # C++ Engine (Nginx) のベースURL
+      AGENTHUB_ENGINE_BASE_URL: ${AGENTHUB_ENGINE_BASE_URL}
+
     restart: unless-stopped
 
   # ---------------------------------

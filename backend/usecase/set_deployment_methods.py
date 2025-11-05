@@ -18,14 +18,14 @@ from domain.services.job_method_finder_domain_service import JobMethodFinderDoma
 # ======================================
 # Usecaseのインターフェース定義
 # ======================================
-class SetDeploymentMethodsUseCase(Protocol): # <--- 名前変更
+class SetDeploymentMethodsUseCase(Protocol):
     """
     特定のデプロイメントに紐づくメソッド（機能）を
     （上書き）設定するユースケースのインターフェース
     """
     def execute(
-        self, input: "SetDeploymentMethodsInput" # <--- 名前変更
-    ) -> Tuple["SetDeploymentMethodsOutput", Exception | None]: # <--- 名前変更
+        self, input: "SetDeploymentMethodsInput"
+    ) -> Tuple["SetDeploymentMethodsOutput", Exception | None]:
         ...
 
 
@@ -33,7 +33,7 @@ class SetDeploymentMethodsUseCase(Protocol): # <--- 名前変更
 # UsecaseのInput
 # ======================================
 @dataclass
-class SetDeploymentMethodsInput: # <--- 名前変更
+class SetDeploymentMethodsInput:
     """認証トークンと、対象のジョブID"""
     token: str
     job_id: int        # このジョブIDから「登録すべきメソッド」をサービスが探す
@@ -51,7 +51,7 @@ class MethodListItemDTO:
 # Output DTO (全体)
 # ======================================
 @dataclass
-class SetDeploymentMethodsOutput: # <--- 名前変更
+class SetDeploymentMethodsOutput:
     """（上書き）設定されたメソッドリストのDTOを含む最終的なOutput"""
     deployment_id: int
     methods: List[MethodListItemDTO]
@@ -60,20 +60,20 @@ class SetDeploymentMethodsOutput: # <--- 名前変更
 # ======================================
 # Presenterのインターフェース定義
 # ======================================
-class SetDeploymentMethodsPresenter(abc.ABC): # <--- 名前変更
+class SetDeploymentMethodsPresenter(abc.ABC):
     """ドメインエンティティ(DeploymentMethods)をOutput DTOに変換するPresenter"""
     @abc.abstractmethod
-    def output(self, methods_entity: DeploymentMethods) -> SetDeploymentMethodsOutput: # <--- 名前変更
+    def output(self, methods_entity: DeploymentMethods) -> SetDeploymentMethodsOutput:
         pass
 
 
 # ======================================
 # Usecaseの具体的な実装 (Interactor)
 # ======================================
-class SetDeploymentMethodsInteractor: # <--- 名前変更
+class SetDeploymentMethodsInteractor:
     def __init__(
         self,
-        presenter: "SetDeploymentMethodsPresenter", # <--- 名前変更
+        presenter: "SetDeploymentMethodsPresenter",
         methods_repo: DeploymentMethodsRepository,
         deployment_repo: DeploymentRepository,
         job_repo: FinetuningJobRepository,
@@ -90,8 +90,8 @@ class SetDeploymentMethodsInteractor: # <--- 名前変更
         self.method_finder_service = method_finder_service
 
     def execute(
-        self, input: SetDeploymentMethodsInput # <--- 名前変更
-    ) -> Tuple["SetDeploymentMethodsOutput", Exception | None]: # <--- 名前変更
+        self, input: SetDeploymentMethodsInput
+    ) -> Tuple["SetDeploymentMethodsOutput", Exception | None]:
         """
         トークンでユーザーを認証し、指定されたJob IDから
         「登録すべきメソッド」をサービスで検索し、
@@ -115,13 +115,17 @@ class SetDeploymentMethodsInteractor: # <--- 名前変更
             if agent is None:
                 raise FileNotFoundError(f"Agent {job.agent_id} (for job {job.id}) not found.")
             
-            if agent.owner_id != user.id:
+            if agent.user_id != user.id:
                 raise PermissionError(
                     "User does not have permission to set methods for this job."
                 )
+            # ▲▲▲ 修正箇所 ▲▲▲
 
             # 4. 親となるデプロイメントを取得
-            deployment: Optional[Deployment] = self.deployment_repo.find_by_job_id(job_id_vo)
+            # 注: find_by_job_idはリストを返す可能性があるため、ここでは単一のデプロイメントを想定
+            deployments: List[Deployment] = self.deployment_repo.find_by_job_id(job_id_vo)
+            deployment: Optional[Deployment] = deployments[0] if deployments else None
+            
             if deployment is None:
                 raise FileNotFoundError(
                     f"Deployment for job {input.job_id} not found. Create deployment first."
@@ -141,6 +145,7 @@ class SetDeploymentMethodsInteractor: # <--- 名前変更
                 methods_to_save = existing_methods
             else:
                 # 存在しない場合：新規作成
+                # DeploymentMethodsエンティティのIDはリポジトリが採番することを期待
                 methods_to_save = DeploymentMethods(
                     id=ID(0), # 採番前ダミーID
                     deployment_id=deployment.id,
@@ -155,7 +160,7 @@ class SetDeploymentMethodsInteractor: # <--- 名前変更
             return output, None
             
         except Exception as e:
-            empty_output = SetDeploymentMethodsOutput( # <--- 名前変更
+            empty_output = SetDeploymentMethodsOutput(
                 deployment_id=0, methods=[]
             )
             return empty_output, e
@@ -164,16 +169,16 @@ class SetDeploymentMethodsInteractor: # <--- 名前変更
 # ======================================
 # Usecaseインスタンスを生成するファクトリ関数
 # ======================================
-def new_set_deployment_methods_interactor( # <--- 名前変更
-    presenter: "SetDeploymentMethodsPresenter", # <--- 名前変更
+def new_set_deployment_methods_interactor(
+    presenter: "SetDeploymentMethodsPresenter",
     methods_repo: DeploymentMethodsRepository,
     deployment_repo: DeploymentRepository,
     job_repo: FinetuningJobRepository,
     agent_repo: AgentRepository,
     auth_service: AuthDomainService,
     method_finder_service: JobMethodFinderDomainService
-) -> "SetDeploymentMethodsUseCase": # <--- 名前変更
-    return SetDeploymentMethodsInteractor( # <--- 名前変更
+) -> "SetDeploymentMethodsUseCase":
+    return SetDeploymentMethodsInteractor(
         presenter=presenter,
         methods_repo=methods_repo,
         deployment_repo=deployment_repo,
