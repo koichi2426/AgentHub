@@ -17,7 +17,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { Deployment } from "@/lib/data";
+import type { Deployment } from "@/lib/data"; // Deployment typeを使用
 
 export default function AgentTabDeployments({
   deployments,
@@ -30,6 +30,9 @@ export default function AgentTabDeployments({
 }) {
   const router = useRouter();
 
+  const sortedDeployments = deployments
+    .slice()
+    .sort((dep1, dep2) => dep2.job_id - dep1.job_id);
   return (
     <Card>
       <CardHeader>
@@ -48,7 +51,7 @@ export default function AgentTabDeployments({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {deployments.map((dep) => (
+            {sortedDeployments.map((dep) => ( // ★ ソート済みリストを使用 ★
               <TableRow
                 key={dep.id}
                 className="cursor-pointer hover:bg-muted/50 transition-colors"

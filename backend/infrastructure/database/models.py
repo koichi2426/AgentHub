@@ -103,3 +103,51 @@ class WeightVisualization(Base):
 
     # FinetuningJob モデルへのリレーションシップを定義 (オプション)
     job = relationship("FinetuningJob", backref="visualization", uselist=False)
+
+
+# ★★★ START: 4 NEW DEPLOYMENT APIs (ここから追加) ★★★
+
+# ----------------- Deployment テーブル定義 (新規追加) -----------------
+class Deployment(Base):
+    """
+    特定のファインチューニングジョブ（job_id）に紐づくデプロイメント情報を表す。
+    C++エンジンの起動状態（ステータスやエンドポイント）を管理する。
+    """
+    __tablename__ = "deployments"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # FinetuningJob への 1:1 関連 (ジョブ1つにつきデプロイは1つ)
+    job_id = Column(Integer, ForeignKey("finetuning_jobs.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+    
+    # ドメインモデルの `status: str` に対応 (例: "pending", "running", "failed", "stopped")
+    status = Column(String(50), nullable=False, default="pending", index=True)
+    
+    # ドメインモデルの `endpoint: Optional[str]` に対応
+    # (例: "http://118.9.7.134:1721/job45")
+    endpoint = Column(String(512), nullable=True)
+
+    # FinetuningJob へのリレーションシップ (Deployment.job で job にアクセス可)
+    job = relationship("FinetuningJob", backref="deployment", uselist=False)
+
+
+# ----------------- DeploymentMethods テーブル定義 (新規追加) -----------------
+class DeploymentMethods(Base):
+    """
+    特定のデプロイメント（deployment_id）に紐づくメソッド（機能）のリストを永続化する。
+    """
+    __tablename__ = "deployment_methods"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+
+    # Deployment への 1:1 関連 (デプロイ1つにつきメソッド設定は1つ)
+    deployment_id = Column(Integer, ForeignKey("deployments.id", ondelete="CASCADE"), nullable=False, unique=True, index=True)
+
+    # ドメインモデルの `methods: List[Method]` (文字列リスト) に対応
+    # (例: ["Optimize the route", "Provide safety and emergency support"])
+    methods = Column(mysql.JSON, nullable=False)
+
+    # Deployment へのリレーションシップ (DeploymentMethods.deployment で deployment にアクセス可)
+    deployment = relationship("Deployment", backref="methods_config", uselist=False)
+
+# ★★★ END: 4 NEW DEPLOYMENT APIs (ここまで追加) ★★★

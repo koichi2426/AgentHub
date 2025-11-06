@@ -1,6 +1,7 @@
 [
   {
-    "deploymentId": "dep_001",
+    "id": "m_entry_001",
+    "deployment_id": "dep_001",
     "methods": [
       "analyze_input",
       "generate_summary",
@@ -9,14 +10,16 @@
     ]
   },
   {
-    "deploymentId": "dep_002",
+    "id": "m_entry_002",
+    "deployment_id": "dep_002",
     "methods": [
       "query_v2_database",
       "process_large_file"
     ]
   },
   {
-    "deploymentId": "dep_003",
+    "id": "m_entry_003",
+    "deployment_id": "dep_003",
     "methods": [
       "scan_vulnerabilities",
       "report_findings",

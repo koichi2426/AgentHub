@@ -12,8 +12,6 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Rocket } from "lucide-react";
-
-// ★★★ [新規追加] Fetcher関数のインポート ★★★
 import { createFinetuningJob } from "@/fetchs/create_finetuning_job/create_finetuning_job";
 import Cookies from "js-cookie";
 
@@ -24,47 +22,45 @@ import Cookies from "js-cookie";
 export default function FineTuningUploader({
   agentId,
 }: {
-  agentId: string;
+  agentId: string | number; // ← 修正: number も許容
 }) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
 
   const handleUpload = async (): Promise<void> => {
     if (!selectedFile) {
-      alert("トレーニングデータファイルを選択してください。"); // アラートメッセージを修正
+      alert("トレーニングデータファイルを選択してください。");
       return;
     }
 
     const token = Cookies.get("auth_token");
     if (!token) {
-        alert("認証トークンが見つかりません。再ログインしてください。");
-        return;
+      alert("認証トークンが見つかりません。再ログインしてください。");
+      return;
     }
 
     setUploading(true);
     try {
-      // ★★★ Fetcher関数への引数を構築 ★★★
       const requestData = {
-          trainingFile: selectedFile,
+        trainingFile: selectedFile,
       };
-      
-      // agentId は string 型で受け取っているため、number に変換
-      const numericAgentId = parseInt(agentId, 10);
+
+      // agentId を number に変換（string の場合も対応）
+      const numericAgentId =
+        typeof agentId === "number" ? agentId : parseInt(agentId, 10);
+
       if (isNaN(numericAgentId)) {
-           throw new Error("Invalid Agent ID format.");
+        throw new Error("Invalid Agent ID format.");
       }
 
-      // ★★★ 新しい Fetcher を使用して API を呼び出す ★★★
       const result = await createFinetuningJob(
         requestData,
         numericAgentId,
         token
       );
 
-      // 成功レスポンスのメッセージを表示
       alert(`ジョブID ${result.id} をキューに送信しました: ${result.message}`);
       setSelectedFile(null);
-
     } catch (err: unknown) {
       const message =
         err instanceof Error

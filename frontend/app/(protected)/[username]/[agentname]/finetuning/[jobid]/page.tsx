@@ -1,5 +1,3 @@
-// frontend/app/(protected)/[username]/[agentname]/finetuning/[jobid]/page.tsx
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -8,10 +6,13 @@ import { notFound } from "next/navigation";
 import Cookies from "js-cookie";
 
 import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_agents";
-import {
-  getUserFinetuningJobs,
-  FinetuningJobListItem,
-} from "@/fetchs/get_user_finetuning_jobs/get_user_finetuning_jobs";
+// ★★★ 修正1: Fetcherの名前とパスを新しいものに置き換え ★★★
+import { 
+  getAgentFinetuningJobs, // ★ 関数名を修正
+  FinetuningJobListItem, // ★ 型のインポート元も修正
+} from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
+// ▲▲▲ 修正ここまで ▲▲▲
+
 import { 
   getWeightVisualizations, 
   GetWeightVisualizationsResponse, 
@@ -60,11 +61,25 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
       setError(null);
 
       try {
-        const [jobsResponse, agentsResponse] = await Promise.all([
-          getUserFinetuningJobs(token),
-          getUserAgents(token)
-        ]);
+        const agentsResponse = await getUserAgents(token); // Agent一覧は全件取得
 
+        // 1. Agentを見つけ、URLのユーザーとエージェント名をチェック
+        const foundAgent = agentsResponse.agents.find(
+          (a) => 
+            a.owner.toLowerCase() === username.toLowerCase() &&
+            a.name.toLowerCase() === agentname.toLowerCase()
+        );
+
+        if (!foundAgent) {
+            notFound();
+            return;
+        }
+        
+        // 2. ★★★ 修正2: Agent IDを使ってジョブ一覧を取得 ★★★
+        // jobsResponse の型は GetAgentFinetuningJobsResponse になる
+        const jobsResponse = await getAgentFinetuningJobs(foundAgent.id, token);
+        
+        // 3. ★★★ 修正3: 取得したリストの中から jobid と一致するものを探す ★★★
         const foundJob = jobsResponse.jobs.find(
           (j) => String(j.id) === String(jobid)
         );
@@ -73,21 +88,11 @@ export default function JobDetailPage({ params }: JobDetailPageProps) {
             notFound();
             return;
         }
-
-        const foundAgent = agentsResponse.agents.find(
-          (a) => String(a.id) === String(foundJob.agent_id)
-        );
-
-        if (!foundAgent) {
-            notFound();
-            return;
-        }
-
-        if (
-            foundAgent.owner.toLowerCase() !== username.toLowerCase() ||
-            foundAgent.name.toLowerCase() !== agentname.toLowerCase()
-        ) {
-            notFound();
+        // ▲▲▲ 修正ここまで ▲▲▲
+        
+        // 権限チェックはユースケース側で行われているが、念のためエージェントIDも確認
+        if (String(foundAgent.id) !== String(foundJob.agent_id)) {
+            notFound(); // Jobが別のAgentに紐づいている場合
             return;
         }
 
