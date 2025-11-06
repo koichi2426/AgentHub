@@ -36,9 +36,9 @@ class DeploymentRepository(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def find_by_job_id(self, job_id: "ID") -> list[Deployment]:
+    def find_by_job_id(self, job_id: "ID") -> Optional[Deployment]: # list[Deployment] から変更
         """
-        job_id に紐づくデプロイメントを検索する
+        job_id に紐づくデプロイメントを（1件）検索する
         """
         pass
 

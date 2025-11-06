@@ -43,11 +43,17 @@ from usecase.create_finetuning_job import CreateFinetuningJobInput, CreateFinetu
 from infrastructure.domain.value_objects.file_data_impl import FastAPIUploadedFileAdapter # ファイルアダプタ
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
-# ▼▼▼ [新規追加] Get Finetuning Jobs 関連のインポート ▼▼▼
-from adapter.controller.get_user_finetuning_jobs_controller import GetUserFinetuningJobsController
-from adapter.presenter.get_user_finetuning_jobs_presenter import new_get_user_finetuning_jobs_presenter
-from usecase.get_user_finetuning_jobs import GetUserFinetuningJobsInput, GetUserFinetuningJobsOutput, new_get_user_finetuning_jobs_interactor
-# ▲▲▲ 新規追加ここまで ▲▲▲
+# ▼▼▼ [修正] Get Agent Finetuning Jobs 関連のインポート ▼▼▼
+from adapter.controller.get_agent_finetuning_jobs_controller import GetAgentFinetuningJobsController
+from adapter.presenter.get_agent_finetuning_jobs_presenter import new_get_agent_finetuning_jobs_presenter
+from usecase.get_agent_finetuning_jobs import GetAgentFinetuningJobsInput, GetAgentFinetuningJobsOutput, new_get_agent_finetuning_jobs_interactor
+# ▲▲▲ 修正ここまで ▲▲▲
+
+# ★★★ START: Get Agent Deployments 関連のインポート ★★★
+from adapter.controller.get_agent_deployments_controller import GetAgentDeploymentsController
+from adapter.presenter.get_agent_deployments_presenter import new_get_agent_deployments_presenter
+from usecase.get_agent_deployments import GetAgentDeploymentsInput, GetAgentDeploymentsOutput, new_get_agent_deployments_interactor
+# ★★★ END: Get Agent Deployments 関連のインポート ★★★
 
 # ▼▼▼ [新規追加] Get Weight Visualizations 関連のインポート ▼▼▼
 from adapter.controller.get_weight_visualizations_controller import GetWeightVisualizationsController
@@ -77,6 +83,34 @@ from infrastructure.domain.services.get_image_stream_domain_service_impl import 
 # ▲▲▲ 新規追加ここまで ★★★ ▼▼▼
 
 
+# ★★★ START: 4 NEW DEPLOYMENT APIs IMPORTS (ここから追加) ★★★
+# (Repositories & Services)
+from infrastructure.database.mysql.deployment_repository import MySQLDeploymentRepository
+from infrastructure.database.mysql.methods_repository import MySQLMethodsRepository
+from infrastructure.domain.services.job_method_finder_domain_service_impl import JobMethodFinderDomainServiceImpl # (HTTP Client Impl)
+
+# (1. Create Deployment)
+from adapter.controller.create_finetuning_job_deployment_controller import CreateFinetuningJobDeploymentController
+from adapter.presenter.create_finetuning_job_deployment_presenter import new_create_finetuning_job_deployment_presenter
+from usecase.create_finetuning_job_deployment import CreateFinetuningJobDeploymentInput, CreateFinetuningJobDeploymentOutput, new_create_finetuning_job_deployment_interactor
+
+# (2. Get Deployment)
+from adapter.controller.get_finetuning_job_deployment_controller import GetFinetuningJobDeploymentController
+from adapter.presenter.get_finetuning_job_deployment_presenter import new_get_finetuning_job_deployment_presenter
+from usecase.get_finetuning_job_deployment import GetFinetuningJobDeploymentInput, GetFinetuningJobDeploymentOutput, new_get_finetuning_job_deployment_interactor
+
+# (3. Get Methods - DBから取得するように変更)
+from adapter.controller.get_deployment_methods_controller import GetDeploymentMethodsController
+from adapter.presenter.get_deployment_methods_presenter import new_get_deployment_methods_presenter
+from usecase.get_deployment_methods import GetDeploymentMethodsInput, GetDeploymentMethodsOutput, new_get_deployment_methods_interactor
+
+# (4. Set Methods)
+from adapter.controller.set_deployment_methods_controller import SetDeploymentMethodsController
+from adapter.presenter.set_deployment_methods_presenter import new_set_deployment_methods_presenter
+from usecase.set_deployment_methods import SetDeploymentMethodsInput, SetDeploymentMethodsOutput, new_set_deployment_methods_interactor
+# ★★★ END: 4 NEW DEPLOYMENT APIs IMPORTS (ここまで追加) ★★★
+
+
 # === Router Setup ===
 router = APIRouter()
 db_config = NewMySQLConfigFromEnv()
@@ -91,8 +125,14 @@ oauth2_scheme = HTTPBearer()
 file_storage_service = NewFileStorageDomainService()
 job_queue_service = NewJobQueueDomainService()
 system_time_service = NewSystemTimeDomainService() 
-file_stream_service = NewFileStreamDomainService() # ★画像ストリームサービスをインスタンス化 ★
+file_stream_service = NewFileStreamDomainService() 
 # ▲▲▲ 新規追加ここまで ▲▲▲
+
+# ★★★ START: 4 NEW DEPLOYMENT APIs DI SETUP (ここから追加) ★★★
+deployment_repo = MySQLDeploymentRepository(db_config)
+methods_repo = MySQLMethodsRepository(db_config)
+job_method_finder_service = JobMethodFinderDomainServiceImpl(timeout=5)
+# ★★★ END: 4 NEW DEPLOYMENT APIs DI SETUP (ここまで追加) ★★★
 
 
 # --- Helper: 共通レスポンス処理 ---
@@ -263,22 +303,65 @@ def create_finetuning_job(
 # ▲▲▲ ファインチューニングジョブ作成エンドポイント ▲▲▲
 
 
-# ▼▼▼ ユーザーのファインチューニングジョブ一覧取得エンドポイント ▼▼▼
-@router.get("/v1/jobs", response_model=GetUserFinetuningJobsOutput)
-def get_user_finetuning_jobs(credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)):
+# ▼▼▼ Agentのファインチューニングジョブ一覧取得エンドポイント ▼▼▼
+@router.get("/v1/agents/{agent_id}/jobs", response_model=GetAgentFinetuningJobsOutput)
+def get_agent_finetuning_jobs(
+    agent_id: int = Path(..., description="ID of the Agent"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
     try:
         token = credentials.credentials
         auth_service = NewAuthDomainService(user_repo)
-        presenter = new_get_user_finetuning_jobs_presenter()
-        usecase = new_get_user_finetuning_jobs_interactor(
-            presenter=presenter, job_repo=finetuning_job_repo, auth_service=auth_service,
+        
+        presenter = new_get_agent_finetuning_jobs_presenter() 
+        usecase = new_get_agent_finetuning_jobs_interactor(
+            presenter=presenter, 
+            job_repo=finetuning_job_repo, 
+            auth_service=auth_service,
+            agent_repo=agent_repo, 
         )
-        controller = GetUserFinetuningJobsController(usecase)
-        response_dict = controller.execute(token=token)
+
+        controller = GetAgentFinetuningJobsController(usecase) 
+        
+        # Controllerのexecuteに引数を渡す
+        response_dict = controller.execute(token=token, agent_id=agent_id) 
+        
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
-# ▲▲▲ ユーザーのファインチューニングジョブ一覧取得エンドポイント ▲▲▲
+# ▲▲▲ Agentのファインチューニングジョブ一覧取得エンドポイント ▲▲▲
+
+
+# ★★★ START: Get Agent Deployments エンドポイント (新規追加) ★★★
+@router.get("/v1/agents/{agent_id}/deployments", response_model=GetAgentDeploymentsOutput)
+def get_agent_deployments(
+    agent_id: int = Path(..., description="ID of the Agent"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    特定のAgentに紐づくデプロイメント（エンドポイント、ステータス）の一覧を取得する。
+    """
+    try:
+        token = credentials.credentials
+        auth_service = NewAuthDomainService(user_repo)
+
+        presenter = new_get_agent_deployments_presenter()
+        usecase = new_get_agent_deployments_interactor(
+            presenter=presenter,
+            deployment_repo=deployment_repo, # DI: デプロイメント取得用
+            agent_repo=agent_repo,           # DI: 権限チェック用
+            auth_service=auth_service,
+        )
+
+        controller = GetAgentDeploymentsController(usecase)
+        
+        # Controllerのexecuteに引数を渡す
+        response_dict = controller.execute(token=token, agent_id=agent_id)
+        
+        return handle_response(response_dict, success_code=200)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+# ★★★ END: Get Agent Deployments エンドポイント ★★★
 
 
 # ▼▼▼ [新規追加] 重み可視化データ取得エンドポイント ★★★ ▼▼▼
@@ -328,3 +411,135 @@ async def serve_visualizations(filepath: str):
     # そのため、handle_response ヘルパーを使わずに直接返す
     return controller.execute(relative_path=filepath)
 # ▲▲▲ 新規追加ここまで ★★★ ▼▼▼
+
+
+# ★★★ START: 4 NEW DEPLOYMENT APIs (ここから追加) ★★★
+
+# --- 1. デプロイメント作成 (POST /v1/jobs/{job_id}/deployment) ---
+@router.post("/v1/jobs/{job_id}/deployment", response_model=CreateFinetuningJobDeploymentOutput)
+def create_deployment(
+    job_id: int = Path(..., description="ID of the Finetuning Job to deploy"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    ファインチューニングジョブIDに基づき、デプロイメント（エンドポイント情報など）をDBに作成する。
+    """
+    try:
+        token = credentials.credentials
+        input_data = CreateFinetuningJobDeploymentInput(token=token, job_id=job_id)
+        
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_create_finetuning_job_deployment_presenter()
+        
+        usecase = new_create_finetuning_job_deployment_interactor(
+            presenter=presenter,
+            deployment_repo=deployment_repo,
+            job_repo=finetuning_job_repo,
+            agent_repo=agent_repo,
+            auth_service=auth_service
+            # (エンドポイントURLはUsecaseが環境変数から自動で構築)
+        )
+        controller = CreateFinetuningJobDeploymentController(usecase)
+        response_dict = controller.execute(input_data=input_data)
+        return handle_response(response_dict, success_code=201) # 201 Created
+    except Exception as e:
+        return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
+
+
+# --- 2. デプロイメント取得 (GET /v1/jobs/{job_id}/deployment) ---
+@router.get("/v1/jobs/{job_id}/deployment", response_model=GetFinetuningJobDeploymentOutput)
+def get_deployment(
+    job_id: int = Path(..., description="ID of the Finetuning Job"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    ファインチューニングジョブIDに紐づくデプロイメントのステータス（エンドポイント等）を取得する。
+    """
+    try:
+        token = credentials.credentials
+        input_data = GetFinetuningJobDeploymentInput(token=token, job_id=job_id)
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_get_finetuning_job_deployment_presenter()
+        
+        usecase = new_get_finetuning_job_deployment_interactor(
+            presenter=presenter,
+            deployment_repo=deployment_repo,
+            job_repo=finetuning_job_repo,
+            agent_repo=agent_repo,
+            auth_service=auth_service
+        )
+        controller = GetFinetuningJobDeploymentController(usecase)
+        response_dict = controller.execute(input_data=input_data)
+        return handle_response(response_dict, success_code=200)
+    except Exception as e:
+        return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
+
+
+# --- 3. メソッド一覧取得 (GET /v1/jobs/{job_id}/methods) ---
+@router.get("/v1/jobs/{job_id}/methods", response_model=GetDeploymentMethodsOutput)
+def get_methods(
+    job_id: int = Path(..., description="ID of the Finetuning Job"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    DBに保存されているメソッド（機能）の一覧を取得する。（仕様変更済み）
+    """
+    try:
+        token = credentials.credentials
+        input_data = GetDeploymentMethodsInput(token=token, job_id=job_id)
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_get_deployment_methods_presenter()
+        
+        usecase = new_get_deployment_methods_interactor(
+            presenter=presenter,
+            methods_repo=methods_repo,    # ← DBから読み込むためのリポジトリを追加
+            deployment_repo=deployment_repo, # ← Deployment ID取得のためのリポジトリを追加
+            job_repo=finetuning_job_repo, # 権限チェック用
+            agent_repo=agent_repo,        # 権限チェック用
+            auth_service=auth_service
+        )
+        
+        controller = GetDeploymentMethodsController(usecase)
+        response_dict = controller.execute(input_data=input_data)
+        return handle_response(response_dict, success_code=200)
+    except Exception as e:
+        return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
+
+# --- 4. メソッド設定 (PUT /v1/jobs/{job_id}/methods) ---
+@router.put("/v1/jobs/{job_id}/methods", response_model=SetDeploymentMethodsOutput) 
+def set_methods(
+    job_id: int = Path(..., description="ID of the Finetuning Job"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    特定のジョブ（デプロイメント）に紐づくメソッド（機能）のリストをDBに保存（上書き）する。
+    """
+    try:
+        token = credentials.credentials
+        
+        input_data = SetDeploymentMethodsInput(
+            token=token,
+            job_id=job_id
+        )
+        
+        auth_service = NewAuthDomainService(user_repo)
+        presenter = new_set_deployment_methods_presenter()
+        
+        usecase = new_set_deployment_methods_interactor(
+            presenter=presenter,
+            methods_repo=methods_repo,
+            deployment_repo=deployment_repo,
+            job_repo=finetuning_job_repo, # 権限チェック用
+            agent_repo=agent_repo,        # 権限チェック用
+            auth_service=auth_service,
+            method_finder_service=job_method_finder_service 
+        )
+        
+        controller = SetDeploymentMethodsController(usecase)
+        response_dict = controller.execute(input_data=input_data)
+        return handle_response(response_dict, success_code=200) # 200 OK
+    except Exception as e:
+        print(f"Set Methods Error: {e}") 
+        return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
+
+# ★★★ END: 4 NEW DEPLOYMENT APIs (ここまで追加) ★★★
