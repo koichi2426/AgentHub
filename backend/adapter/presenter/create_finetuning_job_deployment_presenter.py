@@ -1,4 +1,9 @@
-from usecase.create_finetuning_job_deployment import CreateFinetuningJobDeploymentPresenter, CreateFinetuningJobDeploymentOutput
+from usecase.create_finetuning_job_deployment import (
+    CreateFinetuningJobDeploymentPresenter, 
+    CreateFinetuningJobDeploymentOutput,
+    # ★ 修正1: 内部のDTOをインポートに追加 ★
+    CreatedDeploymentDTO 
+)
 from domain.entities.deployment import Deployment
 
 
@@ -7,11 +12,18 @@ class CreateFinetuningJobDeploymentPresenterImpl(CreateFinetuningJobDeploymentPr
         """
         Deploymentドメインオブジェクトを CreateFinetuningJobDeploymentOutput DTO に変換して返す。
         """
-        return CreateFinetuningJobDeploymentOutput(
+        
+        # 1. 内部の CreatedDeploymentDTO を作成
+        internal_dto = CreatedDeploymentDTO(
             id=deployment.id.value,
-            finetuning_job_id=deployment.job_id.value,
+            job_id=deployment.job_id.value,
             status=deployment.status,
             endpoint=deployment.endpoint,
+        )
+        
+        # 2. ★ 修正2: DTOを 'deployment' キーでラップして返す ★
+        return CreateFinetuningJobDeploymentOutput(
+            deployment=internal_dto
         )
 
 
