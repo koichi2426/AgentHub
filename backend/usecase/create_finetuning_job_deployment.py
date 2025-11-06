@@ -147,7 +147,7 @@ class CreateFinetuningJobDeploymentInteractor:
             new_deployment_data = Deployment(
                 id=ID(0), # 採番前ダミーID
                 job_id=job_id_vo,
-                status="inactive", # 新規作成時は「非アクティブ」
+                status="active",
                 endpoint=full_endpoint
             )
             
