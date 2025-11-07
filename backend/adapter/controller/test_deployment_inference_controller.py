@@ -18,7 +18,8 @@ class TestDeploymentInferenceController:
         """
         self.uc = uc
 
-    def execute(
+    # ★★★ 修正: execute メソッドを async に変更 ★★★
+    async def execute(
         self, input_data: TestDeploymentInferenceInput
     ) -> Dict[str, Union[int, TestDeploymentInferenceOutput, Dict[str, str]]]:
         """
@@ -30,7 +31,8 @@ class TestDeploymentInferenceController:
             output: TestDeploymentInferenceOutput
             err: Exception | None
             
-            output, err = self.uc.execute(input_data)
+            # ★★★ 修正: ユースケースの呼び出しに await を追加 ★★★
+            output, err = await self.uc.execute(input_data)
             
             if err:
                 # 2. エラー処理

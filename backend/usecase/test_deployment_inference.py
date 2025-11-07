@@ -1,5 +1,4 @@
 import abc
-import asyncio
 from dataclasses import dataclass
 from typing import Protocol, Tuple, Optional, List, Dict, Any
 
@@ -26,7 +25,8 @@ class TestDeploymentInferenceUseCase(Protocol):
     """
     デプロイされたモデルに対して、テストファイルを使って同期的に推論テストを実行するユースケース。
     """
-    def execute(
+    # 修正: execute メソッドを非同期 (async) に変更
+    async def execute(
         self, input: "TestDeploymentInferenceInput"
     ) -> Tuple["TestDeploymentInferenceOutput", Exception | None]:
         ...
@@ -59,7 +59,7 @@ class TestMetricsOutput:
 class TestDeploymentInferenceOutput:
     """テスト実行結果とメッセージを含む最終的なOutput"""
     test_result: TestMetricsOutput
-    message: str = "Deployment test run successfully."
+    message: str = "Test run successfully." # メッセージを修正
 
 
 # ======================================
@@ -92,7 +92,8 @@ class TestDeploymentInferenceInteractor:
         self.auth_service = auth_service
         self.test_service = test_service
 
-    def execute(
+    # 修正: execute メソッドを非同期 (async) に変更
+    async def execute(
         self, input: TestDeploymentInferenceInput
     ) -> Tuple["TestDeploymentInferenceOutput", Exception | None]:
         
@@ -118,15 +119,11 @@ class TestDeploymentInferenceInteractor:
             if agent is None or agent.user_id != user.id:
                 raise PermissionError("User does not have permission to run tests for this deployment.")
 
-            # 4. ロジック本体: テストサービスを使って推論テストを実行 (非同期処理を同期的に実行)
-            
-            # Pythonの同期コードから非同期サービスを呼び出すため、Taskを生成し、ループで実行
-            loop = asyncio.get_event_loop()
-            test_result_vo: DeploymentTestResult = loop.run_until_complete(
-                self.test_service.run_batch_inference_test(
-                    test_file=input.test_file,
-                    endpoint_url=deployment.endpoint
-                )
+            # 4. ロジック本体: テストサービスを使って推論テストを実行
+            # 修正: asyncio.run_until_complete を削除し、直接 await
+            test_result_vo: DeploymentTestResult = await self.test_service.run_batch_inference_test(
+                test_file=input.test_file,
+                endpoint_url=deployment.endpoint
             )
 
             # 5. Presenterに渡してOutput DTOに変換

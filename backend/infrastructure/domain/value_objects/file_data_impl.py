@@ -1,6 +1,8 @@
-from typing import BinaryIO, Any
-from domain.value_objects.file_data import UploadedFileStream
+# backend/infrastructure/domain/value_objects/file_data_impl.py
 
+from typing import BinaryIO, Any, Optional
+from domain.value_objects.file_data import UploadedFileStream
+import asyncio 
 
 class FastAPIUploadedFileAdapter(UploadedFileStream):
     """
@@ -8,9 +10,7 @@ class FastAPIUploadedFileAdapter(UploadedFileStream):
     適合させるためのアダプタ（インフラ層の実装）。
     """
     def __init__(self, upload_file: Any): 
-        # 厳密な型チェックを削除し、ダックタイピング（属性チェック）に移行
-        
-        # ファイル操作に必要な 'file' と 'filename' 属性があるかを確認
+        # ファイル操作に必要な属性があるかを確認
         if not hasattr(upload_file, 'file') or not hasattr(upload_file, 'filename'):
              raise TypeError("Object passed to adapter lacks necessary file stream attributes.")
              
@@ -19,17 +19,23 @@ class FastAPIUploadedFileAdapter(UploadedFileStream):
     @property
     def filename(self) -> str:
         """アップロードされた元のファイル名を返す"""
-        # FastAPIのUploadFileのfilenameを参照
         return self._upload_file.filename or ""
 
     @property
-    def content_type(self) -> str:
+    def content_type(self) -> Optional[str]:
         """ファイルのMIMEタイプを返す"""
-        # FastAPIのUploadFileのcontent_typeを参照
-        return self._upload_file.content_type or "application/octet-stream"
+        return self._upload_file.content_type or None
         
     @property
     def file_stream(self) -> BinaryIO:
         """ファイルの内容にアクセスするための標準的なファイルストリームを返す"""
-        # FastAPIのUploadFileのfile属性（spooled temporary file）を参照
         return self._upload_file.file
+        
+    # ★★★ 修正箇所: 欠落していた非同期の read() メソッドを実装 ★★★
+    async def read(self) -> bytes:
+        """
+        ファイルの内容全体を非同期で読み込み、バイトデータとして返す。
+        """
+        # FastAPIの UploadFile.read() は非同期メソッド
+        return await self._upload_file.read() 
+    # ★★★ 修正箇所ここまで ★★★

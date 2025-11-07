@@ -466,7 +466,8 @@ async def test_deployment_inference(
         controller = TestDeploymentInferenceController(usecase)
         
         # 4. Controllerを実行 (Input DTOを渡す)
-        response_dict = controller.execute(input_data)
+        # Controller.executeが async なので await が必要
+        response_dict = await controller.execute(input_data) 
         
         # 5. レスポンスを処理
         return handle_response(response_dict, success_code=200)
