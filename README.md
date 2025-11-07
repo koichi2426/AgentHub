@@ -28,59 +28,7 @@ cd AgentHub
 
 ### ステップ2: 環境変数 (.env) の設定
 
-プロジェクトルートに `.env` ファイルを作成し、以下の内容をコピーしてください。  
-`hoge` の部分は後で実際の値に置き換えます。
-
-```env
-# ---------------------------------
-# データベース接続情報 (MySQL)
-# ---------------------------------
-DB_USER=hoge
-DB_PASSWORD=hoge
-DB_ROOT_PASSWORD=hoge
-DB_NAME=hoge
-DB_HOST=hoge
-DB_PORT=hoge
-
-# FastAPIバックエンドが使用するデータベース接続URL
-DATABASE_URL=hoge
-
-# ---------------------------------
-# JWT 設定
-# ---------------------------------
-SECRET_KEY=hoge
-ALGORITHM=hoge
-ACCESS_TOKEN_EXPIRE_MINUTES=hoge
-
-# ---------------------------------
-# Frontend (Next.js) 用
-# ---------------------------------
-NEXT_PUBLIC_API_URL=hoge
-API_URL_INTERNAL=hoge
-
-# ---------------------------------
-# Celery / Redis 設定
-# ---------------------------------
-CELERY_BROKER_URL=hoge
-CELERY_RESULT_BACKEND=hoge
-CELERY_TASK_TIME_LIMIT=hoge
-CELERY_TASK_MAX_RETRIES=hoge
-
-# ---------------------------------
-# SFTP Storage Settings
-# ---------------------------------
-VPS_IP=hoge
-VPS_USER=hoge
-VPS_ACCOUNT_PASSWORD=hoge
-VPS_KEY_HOST_PATH=hoge
-VPS_KEY_FILE_PATH=hoge
-```
-
-> **補足**  
-> `DB_HOST=db` は Docker ネットワーク内のホスト名として利用されます。  
-> この値は変更しないでください。
-
----
+プロジェクトルートに `.env` ファイルを作成しください。  
 
 ### ステップ3: VPS秘密鍵パス (`VPS_KEY_HOST_PATH`) の設定
 
