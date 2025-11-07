@@ -72,14 +72,16 @@ services:
       VPS_USER: ${VPS_USER}
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
       VPS_PORT: ${VPS_PORT:-22}
-      # --- ▼ 修正済み: Linux実体のパスに変更 ▼ ---
       VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/AgentHubStorage/training_data}
       VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/AgentHubStorage/models}
       VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/AgentHubStorage/visualizations}
-      # --- ▲ 修正完了 ▲ ---
 
       # C++ Engine (Nginx) のベースURL
       AGENTHUB_ENGINE_BASE_URL: ${AGENTHUB_ENGINE_BASE_URL}
+
+      # ★★★ 新規追加: 電力監視APIのURL ★★★
+      POWER_MONITOR_API_URL: ${POWER_MONITOR_API_URL}
+      # ★★★ 新規追加ここまで ★★★
 
     restart: unless-stopped
 
@@ -119,7 +121,6 @@ services:
       VPS_USER: ${VPS_USER}
       VPS_KEY_FILE_PATH: ${VPS_KEY_FILE_PATH}
       VPS_PORT: ${VPS_PORT:-22}
-      # --- ▼ 修正済み: Linux実体のパスに変更 ▼ ---
       VPS_TRAINING_DIR: ${VPS_TRAINING_DIR:-/home/${VPS_USER}/AgentHubStorage/training_data}
       VPS_MODEL_DIR: ${VPS_MODEL_DIR:-/home/${VPS_USER}/AgentHubStorage/models}
       VPS_VISUALS_DIR: ${VPS_VISUALS_DIR:-/home/${VPS_USER}/AgentHubStorage/visualizations}
