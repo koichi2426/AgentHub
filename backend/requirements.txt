@@ -7,13 +7,16 @@ python-dotenv
 passlib
 bcrypt==4.0.1
 python-jose[cryptography]
+
 # --- Celery Client Dependencies ---
 celery
 redis
 python-decouple
+
 # --- FILE UPLOAD & SFTP ---
 python-multipart
 paramiko
 
-# --- C++ Engine HTTP Client ---
+# --- C++ Engine HTTP Client (推論テスト用) ---
+httpx  # ★ 非同期サービス (DeploymentTestDomainServiceImpl) のために追加 ★
 requests
