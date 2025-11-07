@@ -73,11 +73,17 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     async def _process_single_test_case(self, endpoint_url: str, input_line: str, expected_output: str) -> Optional[InferenceCaseResult]:
         """単一のテストケースを実行し、InferenceCaseResult V.O. を構築する。"""
         try:
+            # ★★★ 修正3: 推論前のベースライン電力計測 ★★★
+            power_base_response = await self._get_power_metrics()
+
             # 1. 電力計測APIと推論リクエストを並列で実行
-            power_future = self._get_power_metrics()
             inference_future = self._run_single_inference(endpoint_url, input_line)
             
-            engine_response, power_response = await asyncio.gather(inference_future, power_future)
+            # 推論後のアクティブ時電力を計測
+            engine_response, power_active_response = await asyncio.gather(
+                inference_future, 
+                self._get_power_metrics()
+            )
             
             # 2. 予測値の抽出と正誤判定
             predicted_output = self._extract_predicted_output(engine_response)
@@ -92,18 +98,22 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 predicted_output=predicted_output,
                 is_correct=is_correct,
                 raw_engine_response=engine_response,
-                raw_power_response=power_response
+                # ★★★ 修正4: ベースとアクティブ電力を両方保持する構造に変更 ★★★
+                raw_power_response={
+                    "base": power_base_response,
+                    "active": power_active_response,
+                }
             )
             
         except Exception:
-            # _process_single_test_case 内でCRITICALなエラーが発生した場合 (通常は上流でキャッチされる)
+            # 処理に失敗した場合は None を返し、全体の結果から除外される
             return None 
 
-    # ★★★ 修正箇所 2: セマフォを使用したタスク実行ヘルパーメソッド ★★★
+    # ★★★ 修正箇所 5: セマフォを使用したタスク実行ヘルパーメソッド ★★★
     async def _execute_with_concurrency_limit(self, semaphore: asyncio.Semaphore, endpoint_url: str, input_text: str, expected_output: str) -> Optional[InferenceCaseResult]:
         """セマフォを利用して、_process_single_test_case の実行数を制限する。"""
         async with semaphore:
-            # 修正：C++エンジンの負荷軽減のため、0.5秒の遅延を強制的に挿入
+            # C++エンジンの負荷軽減のため、0.5秒の遅延を強制的に挿入
             await asyncio.sleep(0.5) 
             return await self._process_single_test_case(endpoint_url, input_text, expected_output)
 
@@ -115,7 +125,8 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         accuracy = correct_predictions / total_test_cases if total_test_cases > 0 else 0.0
 
         total_latency_ns = 0
-        total_power_watts = 0.0
+        # ★★★ 修正6: 電力計測を純粋な推論による消費電力 (Net Power) の合計値に変更 ★★★
+        total_net_power_watts = 0.0 
         
         for r in results:
             try:
@@ -124,9 +135,14 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 end_ns = int(r.raw_engine_response.get("end_time_ns", 0))
                 total_latency_ns += (end_ns - start_ns)
                 
-                # 2. 電力（W）の加算
-                power_w = float(r.raw_power_response.get("power_watts", "0.0"))
-                total_power_watts += power_w
+                # 2. 電力（W）の差分計算
+                power_active_w = float(r.raw_power_response["active"].get("power_watts", "0.0"))
+                power_base_w = float(r.raw_power_response["base"].get("power_watts", "0.0"))
+                
+                # Net Power = アクティブ時電力 - ベースライン電力。負にならないよう max(0, ...) を適用
+                net_power_w = max(0.0, power_active_w - power_base_w)
+                
+                total_net_power_watts += net_power_w
             except Exception:
                 continue
 
@@ -137,9 +153,10 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         avg_latency_ms = (total_latency_ns / total_test_cases) / 1_000_000
         
         # 4. コスト計算 (mWh)
-        avg_power_w = total_power_watts / total_test_cases
+        avg_net_power_w = total_net_power_watts / total_test_cases
         avg_latency_s = avg_latency_ms / 1000
-        cost_estimate_mwh = avg_power_w * avg_latency_s * 1000
+        # Net Power を使ってコストを計算
+        cost_estimate_mwh = avg_net_power_w * avg_latency_s * 1000 
         
         return TestRunMetrics(
             accuracy=accuracy,
