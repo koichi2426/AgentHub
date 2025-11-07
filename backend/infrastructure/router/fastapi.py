@@ -67,6 +67,14 @@ from adapter.presenter.get_image_stream_presenter import new_get_image_stream_pr
 from usecase.get_image_stream import GetImageStreamInput, GetImageStreamOutput, new_get_image_stream_interactor
 # ▲▲▲ 新規追加ここまで ★★★ ▼▼▼
 
+# ★★★ START: Test Deployment Inference 関連のインポート (新規) ★★★
+from adapter.controller.test_deployment_inference_controller import TestDeploymentInferenceController
+from adapter.presenter.test_deployment_inference_presenter import new_test_deployment_inference_presenter
+from usecase.test_deployment_inference import TestDeploymentInferenceInput, TestDeploymentInferenceOutput, new_test_deployment_inference_interactor
+from infrastructure.domain.services.deployment_test_domain_service_impl import DeploymentTestDomainServiceImpl
+import httpx # 非同期 HTTP クライアント
+# ★★★ END: Test Deployment Inference 関連のインポート ★★★
+
 
 # (Infrastructure / Domain Services)
 from infrastructure.database.mysql.user_repository import MySQLUserRepository
@@ -128,11 +136,20 @@ system_time_service = NewSystemTimeDomainService()
 file_stream_service = NewFileStreamDomainService() 
 # ▲▲▲ 新規追加ここまで ▲▲▲
 
-# ★★★ START: 4 NEW DEPLOYMENT APIs DI SETUP (ここから追加) ★★★
+# ★★★ START: DI SETUP (Test Inference に必要なDIを追加) ★★★
 deployment_repo = MySQLDeploymentRepository(db_config)
 methods_repo = MySQLMethodsRepository(db_config)
 job_method_finder_service = JobMethodFinderDomainServiceImpl(timeout=5)
-# ★★★ END: 4 NEW DEPLOYMENT APIs DI SETUP (ここまで追加) ★★★
+
+# ★★★ 修正箇所: auth_service の定義を追加 ★★★
+auth_service = NewAuthDomainService(user_repo) 
+
+# 非同期 HTTP クライアント (httpx) をここで初期化
+async_http_client = httpx.AsyncClient(timeout=15.0) 
+
+# Test Deployment Inference Service を初期化
+test_inference_service = DeploymentTestDomainServiceImpl(client=async_http_client)
+# ★★★ END: DI SETUP ★★★
 
 
 # --- Helper: 共通レスポンス処理 ---
@@ -411,6 +428,52 @@ async def serve_visualizations(filepath: str):
     # そのため、handle_response ヘルパーを使わずに直接返す
     return controller.execute(relative_path=filepath)
 # ▲▲▲ 新規追加ここまで ★★★ ▼▼▼
+
+# ★★★ START: Test Deployment Inference エンドポイント (新規追加) ★★★
+@router.post("/v1/deployments/{deployment_id}/test", response_model=TestDeploymentInferenceOutput)
+async def test_deployment_inference(
+    deployment_id: int = Path(..., description="ID of the Deployment to test"),
+    test_file: UploadFile = File(..., description="Test data file (.txt)"),
+    credentials: HTTPAuthorizationCredentials = Depends(oauth2_scheme)
+):
+    """
+    デプロイされたモデルに対して、テストデータファイルを使用して推論テストを実行する。
+    """
+    try:
+        token = credentials.credentials
+        
+        # 1. FastAPIのUploadedFileを抽象V.O.に変換
+        domain_file_stream = FastAPIUploadedFileAdapter(test_file)
+        
+        # 2. Input DTOを生成
+        input_data = TestDeploymentInferenceInput(
+            token=token,
+            deployment_id=deployment_id,
+            test_file=domain_file_stream
+        )
+        
+        # 3. ユースケース、Presenterを組み立て (DI)
+        presenter = new_test_deployment_inference_presenter()
+        usecase = new_test_deployment_inference_interactor(
+            presenter=presenter,
+            deployment_repo=deployment_repo,
+            job_repo=finetuning_job_repo,
+            agent_repo=agent_repo,
+            auth_service=auth_service,
+            test_service=test_inference_service # ★ サービスをDI
+        )
+        
+        controller = TestDeploymentInferenceController(usecase)
+        
+        # 4. Controllerを実行 (Input DTOを渡す)
+        response_dict = controller.execute(input_data)
+        
+        # 5. レスポンスを処理
+        return handle_response(response_dict, success_code=200)
+        
+    except Exception as e:
+        return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
+# ★★★ END: Test Deployment Inference エンドポイント ★★★
 
 
 # ★★★ START: 4 NEW DEPLOYMENT APIs (ここから追加) ★★★
