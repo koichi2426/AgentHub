@@ -10,7 +10,7 @@ from typing import List, Dict, Any, Optional
 from domain.value_objects.file_data import UploadedFileStream
 from domain.services.deployment_test_domain_service import DeploymentTestDomainService
 
-# ★★★ 修正: 定義済みの Value Object を正確にインポート ★★★
+# 定義済みの Value Object を正確にインポート
 from domain.value_objects.deployment_test_result import DeploymentTestResult 
 from domain.value_objects.inference_case_result import InferenceCaseResult
 from domain.value_objects.test_run_metrics import TestRunMetrics
@@ -25,12 +25,11 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     デプロイメントテスト実行の具体的な実装。
     外部サービスに並列で問い合わせ、最終的な評価結果V.O.を構築する。
     """
-    # ★★★ 修正箇所 1: 最大並列数をクラス定数として定義 ★★★
-    MAX_CONCURRENCY = 2 
+    # ★★★ 修正箇所 1: 最大並列数を 1 に設定し、逐次実行を強制 ★★★
+    MAX_CONCURRENCY = 1 
 
     def __init__(self, client: httpx.AsyncClient):
         self._client = client
-        # 推論と電力計測のAPI URLは、このImplが知っている（インフラ層の責務）
 
     def _extract_predicted_output(self, engine_response: Dict[str, Any]) -> str:
         """エンジンレスポンスから最も類似度の高い予測値（method）を抽出する。"""
@@ -63,13 +62,18 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
             response.raise_for_status()
             return response.json()
         except httpx.HTTPError as e:
-            return {"status": "error", "error_detail": str(e), "results": []}
+            # 4xx/5xx エラーの場合は、エラー詳細をレスポンスに含めて返す
+            error_message = f"Client error '{e.response.status_code} {e.response.reason_phrase}' for url '{endpoint_url}'"
+            return {"status": "error", "error_detail": error_message, "results": []}
+        except Exception as e:
+            # 接続エラーなどの場合は、詳細を返す
+            return {"status": "error", "error_detail": f"Connection Error: {str(e)}", "results": []}
+
 
     async def _process_single_test_case(self, endpoint_url: str, input_line: str, expected_output: str) -> Optional[InferenceCaseResult]:
         """単一のテストケースを実行し、InferenceCaseResult V.O. を構築する。"""
         try:
             # 1. 電力計測APIと推論リクエストを並列で実行
-            # 注意: _process_single_test_case 自体は並列だが、外部からはセマフォで制限される
             power_future = self._get_power_metrics()
             inference_future = self._run_single_inference(endpoint_url, input_line)
             
@@ -91,16 +95,16 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 raw_power_response=power_response
             )
             
-        except Exception as e:
-            # 処理に失敗した場合は None を返し、全体の結果から除外される
+        except Exception:
+            # _process_single_test_case 内でCRITICALなエラーが発生した場合 (通常は上流でキャッチされる)
             return None 
 
     # ★★★ 修正箇所 2: セマフォを使用したタスク実行ヘルパーメソッド ★★★
     async def _execute_with_concurrency_limit(self, semaphore: asyncio.Semaphore, endpoint_url: str, input_text: str, expected_output: str) -> Optional[InferenceCaseResult]:
         """セマフォを利用して、_process_single_test_case の実行数を制限する。"""
         async with semaphore:
-            # 負荷軽減のため、わずかな遅延を挟む (オプション)
-            await asyncio.sleep(0.05) 
+            # 修正：C++エンジンの負荷軽減のため、0.5秒の遅延を強制的に挿入
+            await asyncio.sleep(0.5) 
             return await self._process_single_test_case(endpoint_url, input_text, expected_output)
 
     def _calculate_metrics(self, results: List[InferenceCaseResult]) -> TestRunMetrics:
@@ -160,7 +164,6 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         test_data_pairs = [line.split('\t', 1) for line in file_content.split('\n') if line.strip() and len(line.split('\t', 1)) == 2]
         
         # 2. 並列処理のためのタスク生成
-        # ★★★ 修正箇所 3: セマフォの初期化とタスクの変更 ★★★
         semaphore = asyncio.Semaphore(self.MAX_CONCURRENCY)
         tasks = []
         for input_text, expected_output in test_data_pairs:
