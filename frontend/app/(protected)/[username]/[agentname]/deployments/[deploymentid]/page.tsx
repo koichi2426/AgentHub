@@ -10,12 +10,14 @@ import { getUserAgents, AgentListItem } from "@/fetchs/get_user_agents/get_user_
 
 // Agent Finetuning Jobs fetcher
 import { getAgentFinetuningJobs } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
-import type { FinetuningJobListItem } from "@/fetchs/get_agent_finetuning_jobs/get_agent_finetuning_jobs"; 
 
 import { getFinetuningJobDeployment, GetFinetuningJobDeploymentResponse } from "@/fetchs/get_finetuning_job_deployment/get_finetuning_job_deployment";
 
-// メソッド関連の型インポート
-import { getDeploymentMethods, MethodListItemDTO } from "@/fetchs/get_deployment_methods/get_deployment_methods"; 
+// メソッド関連の型インポート (関数のみインポート)
+import { getDeploymentMethods } from "@/fetchs/get_deployment_methods/get_deployment_methods"; 
+
+// 推論テスト関連のインポート (関数のみインポート)
+import { testDeploymentInference } from "@/fetchs/test_deployment_inference/test_deployment_inference"; 
 
 // UIコンポーネント
 import DeploymentBreadcrumb from "@/components/deployments/DeploymentBreadcrumb";
@@ -24,7 +26,15 @@ import DeploymentTestCard from "@/components/deployments/DeploymentTestCard";
 import DeploymentDangerZone from "@/components/deployments/DeploymentDangerZone";
 import DeploymentMethodsCard from "@/components/deployments/DeploymentMethodsCard";
 
-import type { User, Agent, Deployment } from "@/lib/data";
+// ★★★ 修正: 全てのDTO/VOを lib/data.ts からインポート ★★★
+import type { 
+    User, 
+    Agent, 
+    Deployment, 
+    DeploymentTestResponse, // メインのテスト結果型
+    MethodListItemDTO,      // メソッドリスト型
+    FinetuningJobListItem,  // Jobリスト型
+} from "@/lib/data";
 
 type DeploymentDetailPageProps = {
   params: {
@@ -40,9 +50,13 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
 
   const [user, setUser] = useState<User | null>(null);
   const [agentData, setAgentData] = useState<AgentListItem | null>(null);
-  const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null);
+  const [jobData, setJobData] = useState<FinetuningJobListItem | null>(null); 
   const [deploymentData, setDeploymentData] = useState<GetFinetuningJobDeploymentResponse | null>(null);
-  const [methods, setMethods] = useState<MethodListItemDTO[]>([]);
+  const [methods, setMethods] = useState<MethodListItemDTO[]>([]); 
+  
+  // TestResult State の型を lib/data.ts の型に変更
+  const [testResult, setTestResult] = useState<DeploymentTestResponse | null>(null); 
+  
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -84,6 +98,16 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         );
         if (!foundJob) notFound();
 
+        // ★★★ 修正箇所: foundJobの status の型不一致を解消 ★★★
+        const JobStatusUnion = ['completed', 'running', 'failed', 'queued'];
+        const isStatusValid = JobStatusUnion.includes(foundJob.status.toLowerCase());
+
+        const safeJobData = {
+            ...foundJob,
+            status: isStatusValid ? foundJob.status as 'completed' | 'running' | 'failed' | 'queued' : 'failed',
+        } as FinetuningJobListItem;
+        // ★★★ 修正箇所ここまで ★★★
+
         if (
           foundAgent.owner.toLowerCase() !== username.toLowerCase() ||
           foundAgent.name.toLowerCase() !== agentname.toLowerCase()
@@ -92,15 +116,13 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         }
 
         setAgentData(foundAgent);
-        setJobData(foundJob);
+        setJobData(safeJobData); // ★ キャストしたデータを使う
 
         // --- Step 2: デプロイメント取得 ---
         let deployment: GetFinetuningJobDeploymentResponse | null = null;
         try {
-          // デプロイメントが存在しない場合はここでエラーがスローされる想定
           deployment = await getFinetuningJobDeployment(Number(foundJob.id), token);
         } catch {
-          // デプロイメントが存在しない場合は、ここでnotFound()
           notFound(); 
           return;
         }
@@ -152,6 +174,33 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
     notFound(); 
     return null;
   }
+  
+  // ★★★ 修正箇所: テスト実行ハンドラを定義し、型キャストでエラーを解消 ★★★
+  const handleRunTest = async (testFile: File) => {
+    const token = Cookies.get("auth_token");
+    if (!token) return;
+
+    setTestResult(null); 
+    setIsLoading(true); 
+    setError(null);
+
+    try {
+        const requestData = { testFile };
+        
+        // 厳密な二段階キャストで型チェックを強制 (TS2352解消)
+        const rawResult = await testDeploymentInference(requestData, deploymentData.id, token);
+        const result = rawResult as unknown as DeploymentTestResponse; 
+        
+        setTestResult(result);
+    } catch (e: unknown) { // ★ 修正: 'any' を 'unknown' に修正し、ESLint Errorを解消
+        console.error("Test execution failed:", e);
+        const msg = e instanceof Error ? e.message : 'Unknown error occurred.';
+        setError(`Test execution failed: ${msg}`);
+    } finally {
+        setIsLoading(false); 
+    }
+  };
+
 
   const agent: Agent = {
     id: agentData.id,
@@ -188,7 +237,14 @@ export default function DeploymentDetailPage({ params }: DeploymentDetailPagePro
         <DeploymentMethodsCard methods={methodNames} />
       </div>
 
-      <DeploymentTestCard deploymentId={String(deployment.id)} />
+      <DeploymentTestCard 
+        deploymentId={String(deployment.id)} 
+        onRunTest={handleRunTest}
+        testResult={testResult}
+        isTestLoading={isLoading} 
+        errorMessage={error} // エラーメッセージを渡す
+      />
+      
       <DeploymentDangerZone
         deploymentId={String(deployment.id)}
         onDelete={handleDeleteDeployment}

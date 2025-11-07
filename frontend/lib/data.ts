@@ -29,9 +29,13 @@ export type FinetuningJob = {
   status: "completed" | "running" | "failed" | "queued";
   training_file_path: string;
   error_message: string | null;
-  created_at: string;
-  finished_at: string | null;
+  created_at: string; // ISO 8601 string
+  finished_at: string | null; // ISO 8601 string or null
 };
+
+// ★★★ 修正箇所: FinetuningJobListItem を FinetuningJob のエイリアスとしてエクスポート ★★★
+export type FinetuningJobListItem = FinetuningJob; 
+// ★★★ 修正箇所ここまで ★★★
 
 // ======================================
 // デプロイメント（API）の型定義
@@ -86,4 +90,71 @@ export type Visualizations = {
 export type DeploymentMethodsEntry = {
   deploymentId: number;
   methods: string[];
+};
+
+// ======================================
+// ★★★ 推論テスト結果の型定義 (新規追加) ★★★
+// ======================================
+
+interface EngineResponseRaw {
+  results: Array<{ method: string; similarity: string }>;
+  start_time_ns: string;
+  end_time_ns: string;
+}
+
+interface PowerResponseRaw {
+  status: string;
+  gpu_index: number;
+  power_watts: string;
+  timestamp_ns: string;
+}
+
+/**
+ * 個別ケースの結果 (InferenceCaseResult V.O. に対応)
+ */
+export type InferenceCaseResult = {
+  id: number; // Presenterで付与される表示用ID
+  input_data: string;
+  expected_output: string;
+  predicted_output: string;
+  is_correct: boolean;
+  raw_engine_response: EngineResponseRaw;
+  raw_power_response: {
+    base: PowerResponseRaw;
+    active: PowerResponseRaw;
+  };
+};
+
+/**
+ * 全体の評価メトリクス (TestRunMetrics V.O. に対応)
+ */
+export type TestRunMetrics = {
+  accuracy: number;
+  latency_ms: number;
+  cost_estimate_mwh: number;
+  total_test_cases: number;
+  correct_predictions: number;
+};
+
+/**
+ * テスト結果のコンテナ (TestMetricsOutput DTO に対応)
+ */
+export type TestResultMetrics = {
+  overall_metrics: TestRunMetrics;
+  case_results: InferenceCaseResult[];
+};
+
+/**
+ * Test Deployment Inference API の最終レスポンス型
+ */
+export type DeploymentTestResponse = {
+  test_result: TestResultMetrics;
+  message: string;
+};
+
+/**
+ * メソッドリストのDTO (GetDeploymentMethodsResponse/SetDeploymentMethodsResponse の内部型)
+ */
+export type MethodListItemDTO = {
+  name: string;
 };
