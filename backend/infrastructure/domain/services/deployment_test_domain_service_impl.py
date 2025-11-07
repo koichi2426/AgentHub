@@ -25,6 +25,8 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     デプロイメントテスト実行の具体的な実装。
     外部サービスに並列で問い合わせ、最終的な評価結果V.O.を構築する。
     """
+    # ★★★ 修正箇所 1: 最大並列数をクラス定数として定義 ★★★
+    MAX_CONCURRENCY = 2 
 
     def __init__(self, client: httpx.AsyncClient):
         self._client = client
@@ -51,6 +53,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     async def _run_single_inference(self, endpoint_url: str, input_text: str) -> Dict[str, Any]:
         """単一の推論リクエストを外部エンジンに非同期で送信する。"""
         try:
+            # ペイロードは {"prompt": "..."} で確定
             payload = {"prompt": input_text}
             response = await self._client.post(
                 endpoint_url, 
@@ -66,6 +69,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         """単一のテストケースを実行し、InferenceCaseResult V.O. を構築する。"""
         try:
             # 1. 電力計測APIと推論リクエストを並列で実行
+            # 注意: _process_single_test_case 自体は並列だが、外部からはセマフォで制限される
             power_future = self._get_power_metrics()
             inference_future = self._run_single_inference(endpoint_url, input_line)
             
@@ -90,6 +94,14 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         except Exception as e:
             # 処理に失敗した場合は None を返し、全体の結果から除外される
             return None 
+
+    # ★★★ 修正箇所 2: セマフォを使用したタスク実行ヘルパーメソッド ★★★
+    async def _execute_with_concurrency_limit(self, semaphore: asyncio.Semaphore, endpoint_url: str, input_text: str, expected_output: str) -> Optional[InferenceCaseResult]:
+        """セマフォを利用して、_process_single_test_case の実行数を制限する。"""
+        async with semaphore:
+            # 負荷軽減のため、わずかな遅延を挟む (オプション)
+            await asyncio.sleep(0.05) 
+            return await self._process_single_test_case(endpoint_url, input_text, expected_output)
 
     def _calculate_metrics(self, results: List[InferenceCaseResult]) -> TestRunMetrics:
         """個別の結果V.O.から、全体の評価メトリクスを計算する。"""
@@ -121,10 +133,6 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         avg_latency_ms = (total_latency_ns / total_test_cases) / 1_000_000
         
         # 4. コスト計算 (mWh)
-        # Avg Power (W) = Total Power (W) / Total Cases
-        # Avg Latency (s) = Avg Latency (ms) / 1000
-        # Cost (mWh) = Avg Power (W) * Avg Latency (s) * 1000 (W -> mWh 変換)
-        
         avg_power_w = total_power_watts / total_test_cases
         avg_latency_s = avg_latency_ms / 1000
         cost_estimate_mwh = avg_power_w * avg_latency_s * 1000
@@ -152,13 +160,17 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         test_data_pairs = [line.split('\t', 1) for line in file_content.split('\n') if line.strip() and len(line.split('\t', 1)) == 2]
         
         # 2. 並列処理のためのタスク生成
+        # ★★★ 修正箇所 3: セマフォの初期化とタスクの変更 ★★★
+        semaphore = asyncio.Semaphore(self.MAX_CONCURRENCY)
         tasks = []
         for input_text, expected_output in test_data_pairs:
             tasks.append(
-                self._process_single_test_case(endpoint_url, input_text, expected_output)
+                self._execute_with_concurrency_limit(
+                    semaphore, endpoint_url, input_text, expected_output
+                )
             )
             
-        # 3. 全てのタスクが完了するのを待つ (非同期並列実行)
+        # 3. 全てのタスクが完了するのを待つ (並列数を制限した実行)
         case_results: List[Optional[InferenceCaseResult]] = await asyncio.gather(*tasks)
         
         # 4. 失敗したケース (None) を除外
