@@ -51,7 +51,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     async def _run_single_inference(self, endpoint_url: str, input_text: str) -> Dict[str, Any]:
         """単一の推論リクエストを外部エンジンに非同期で送信する。"""
         try:
-            payload = {"input_text": input_text}
+            payload = {"prompt": input_text}
             response = await self._client.post(
                 endpoint_url, 
                 json=payload, 
