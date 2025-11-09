@@ -10,7 +10,7 @@ from domain.entities.agent import Agent, AgentRepository
 # Usecaseのインターフェース定義
 # ======================================
 class GetAgentsUseCase(Protocol):
-    """現存する全てのアクティブなエージェントを取得するユースケースのインターフェース"""
+    """現存する全てのエージェントを取得するユースケースのインターフェース"""
     def execute(
         self, input: "GetAgentsInput"
     ) -> Tuple["GetAgentsOutput", Exception | None]:
@@ -39,6 +39,7 @@ class AgentListItem:
     name: str
     description: Optional[str]
 
+
 # ======================================
 # Output DTO (全体)
 # ======================================
@@ -63,7 +64,7 @@ class GetAgentsPresenter(abc.ABC):
 # Usecaseの具体的な実装 (Interactor)
 # ======================================
 class GetAgentsInteractor:
-    """現存する全てのアクティブなエージェント一覧を取得するユースケースの実行処理"""
+    """現存する全てのエージェント一覧を取得するユースケースの実行処理"""
     def __init__(
         self,
         presenter: GetAgentsPresenter,
@@ -76,13 +77,13 @@ class GetAgentsInteractor:
         self, input: GetAgentsInput
     ) -> Tuple[GetAgentsOutput, Exception | None]:
         """
-        AgentRepositoryからアクティブな全てのエージェント一覧を取得する。
+        AgentRepositoryから全てのエージェント一覧を取得する。
         """
         empty_output = GetAgentsOutput(agents=[])
         
         try:
-            # 1. AgentRepositoryから現存する全てのアクティブなエージェントを取得
-            agents_list: List[Agent] = self.agent_repo.list_all_active()
+            # 1. AgentRepositoryから全てのエージェントを取得（←ここを修正）
+            agents_list: List[Agent] = self.agent_repo.find_all()
             
             # 2. Presenterに渡してOutput DTOに変換
             output = self.presenter.output(agents_list)
