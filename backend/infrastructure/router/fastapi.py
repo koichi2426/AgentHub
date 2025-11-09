@@ -334,7 +334,7 @@ def get_job_visualizations(
             agent_repo=agent_repo, auth_service=auth_service,
         )
         controller = GetWeightVisualizationsController(usecase)
-        response_dict = controller.execute(input_data)
+        response_dict = controller.execute(token=token, job_id=job_id)
         return handle_response(response_dict, success_code=200)
     except Exception as e:
         return JSONResponse({"error": f"An unexpected server error occurred: {e}"}, status_code=500)
