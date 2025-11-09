@@ -9,7 +9,7 @@ import Link from "next/link";
 import Cookies from "js-cookie";
 import { getUser, GetUserResponse } from "../../fetchs/get_user/get_user";
 import { getUserAgents, GetUserAgentsResponse } from "../../fetchs/get_user_agents/get_user_agents";
-import { getAgents, GetAgentsResponse } from "../../fetchs/get_agents/get_agents"; // ←追加
+import { getAgents, GetAgentsResponse } from "../../fetchs/get_agents/get_agents";
 
 export default function HomePage() {
   const [user, setUser] = useState<GetUserResponse | null>(null);
@@ -92,7 +92,11 @@ export default function HomePage() {
               userAgents.map((agent) => (
                 <div key={agent.id} className="flex items-center gap-2 text-sm">
                   <Bot className="w-4 h-4 text-muted-foreground" />
-                  <Link href="#" className="hover:underline truncate">
+                  {/* ✅ 修正部分：URLを /{owner}/{name} に */}
+                  <Link
+                    href={`/${agent.owner}/${agent.name}`}
+                    className="hover:underline truncate"
+                  >
                     {agent.owner}/{agent.name}
                   </Link>
                 </div>
@@ -118,12 +122,9 @@ export default function HomePage() {
                       <li key={agent.id} className="border-b pb-4 last:border-b-0">
                         <div className="flex items-center gap-2">
                           <Bot className="w-4 h-4" />
-                          <Link
-                            href="#"
-                            className="text-xl font-bold text-blue-500 hover:underline truncate"
-                          >
+                          <span className="text-xl font-bold text-blue-500 truncate">
                             {agent.owner}/{agent.name}
-                          </Link>
+                          </span>
                         </div>
                         <p className="text-muted-foreground mt-2">
                           {agent.description}
