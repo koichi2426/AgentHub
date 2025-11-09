@@ -147,7 +147,13 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 continue
 
         if total_test_cases == 0:
-             return TestRunMetrics(accuracy=0.0, latency_ms=0.0, cost_estimate_mwh=0.0, total_test_cases=0, correct_predictions=0)
+            return TestRunMetrics(
+                accuracy=0.0,
+                latency_ms=0.0,
+                cost_estimate_mwh=0.0,
+                total_test_cases=0,
+                correct_predictions=0
+            )
 
         # 3. 平均レイテンシ (ミリ秒)
         avg_latency_ms = (total_latency_ns / total_test_cases) / 1_000_000
@@ -155,8 +161,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         # 4. コスト計算 (mWh)
         avg_net_power_w = total_net_power_watts / total_test_cases
         avg_latency_s = avg_latency_ms / 1000
-        # Net Power を使ってコストを計算
-        cost_estimate_mwh = avg_net_power_w * avg_latency_s * 1000 
+        cost_estimate_mwh = avg_net_power_w * (avg_latency_s / 3600) * 1000
         
         return TestRunMetrics(
             accuracy=accuracy,
