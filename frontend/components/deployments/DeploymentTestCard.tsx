@@ -68,12 +68,12 @@ export default function DeploymentTestCard({
       ].join(",");
     });
 
-    // 👇 MJも含めたサマリーを追加
+    // 👇 mJも含めたサマリーを追加
     const overallSummary = [
       ["Overall Accuracy:", overall_metrics.accuracy.toFixed(4)],
       ["Average Latency (ms):", overall_metrics.latency_ms.toFixed(3)],
       ["Average Cost (mWh):", overall_metrics.cost_estimate_mwh.toFixed(4)],
-      ["Average Cost (MJ):", overall_metrics.cost_estimate_mj.toFixed(6)], // ★追加
+      ["Average Cost (mJ):", overall_metrics.cost_estimate_mj.toFixed(6)], // ★追加
       ["Total Cases:", overall_metrics.total_test_cases],
       ["Correct Predictions:", overall_metrics.correct_predictions],
     ]
@@ -193,12 +193,12 @@ export default function DeploymentTestCard({
                 <p className="font-medium text-muted-foreground">Avg Latency:</p>
                 <p className="font-medium">{metrics.latency_ms.toFixed(2)} ms</p>
 
-                {/* --- ここを修正: MJも追加 --- */}
+                {/* --- ここを修正: mJも追加 --- */}
                 <p className="font-medium text-muted-foreground">Avg Cost:</p>
                 <p className="font-medium text-red-500">
                   {metrics.cost_estimate_mwh.toFixed(4)} mWh
                   <span className="text-muted-foreground ml-2">
-                    ({metrics.cost_estimate_mj.toFixed(6)} MJ)
+                    ({metrics.cost_estimate_mj.toFixed(6)} mJ)
                   </span>
                 </p>
               </div>
