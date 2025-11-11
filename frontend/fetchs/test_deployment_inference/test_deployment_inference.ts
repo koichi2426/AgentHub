@@ -33,7 +33,8 @@ interface TestRunMetricsDTO {
   accuracy: number;
   latency_ms: number;
   cost_estimate_mwh: number;
-  cost_estimate_mj: number; // ★ 追加：MJ換算の推論コスト
+  cost_estimate_mj: number;
+  gross_mj: number;
   total_test_cases: number;
   correct_predictions: number;
 }

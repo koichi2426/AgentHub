@@ -9,5 +9,6 @@ class TestRunMetrics:
     latency_ms: float              # ナノ秒から計算した平均推論時間 (ミリ秒)
     cost_estimate_mwh: float       # 推論あたりの平均エネルギーコスト (mWh)
     cost_estimate_mj: float        # 推論あたりの平均エネルギーコスト (MJ)
+    gross_mj: float                # 総消費エネルギー量 (MJ, Gross: ベース＋推論含む)
     total_test_cases: int
     correct_predictions: int
