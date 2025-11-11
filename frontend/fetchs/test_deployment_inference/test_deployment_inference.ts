@@ -1,5 +1,3 @@
-// frontend/fetchs/test_deployment_inference/test_deployment_inference.ts
-
 import { API_URL } from "../config";
 
 // ======================================
@@ -33,7 +31,8 @@ interface TestRunMetricsDTO {
   accuracy: number;
   latency_ms: number;
   cost_estimate_mwh: number;
-  cost_estimate_mj: number; // ★ 追加：MJ換算の推論コスト
+  cost_estimate_mj: number;
+  average_gross_mj: number; // ★★★ 修正: gross_mj → average_gross_mj ★★★
   total_test_cases: number;
   correct_predictions: number;
 }
