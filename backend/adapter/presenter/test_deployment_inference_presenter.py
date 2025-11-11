@@ -1,5 +1,3 @@
-# backend/adapter/presenter/test_deployment_inference_presenter.py
-
 from typing import List, Dict, Any
 
 # ユースケース層の依存関係
@@ -22,12 +20,13 @@ class TestDeploymentInferencePresenterImpl(TestDeploymentInferencePresenter):
         V.O.からデータを抽出し、ネストされた Dict 構造を作成する。
         """
 
-        # === 修正点: cost_estimate_mj を追加 ===
+        # === 修正点: gross_mj を追加 ===
         overall_metrics_dict: Dict[str, Any] = {
             "accuracy": result.overall_metrics.accuracy,
             "latency_ms": result.overall_metrics.latency_ms,
             "cost_estimate_mwh": result.overall_metrics.cost_estimate_mwh,
-            "cost_estimate_mj": result.overall_metrics.cost_estimate_mj,  # ← 追加
+            "cost_estimate_mj": result.overall_metrics.cost_estimate_mj,
+            "gross_mj": result.overall_metrics.gross_mj,  # ★★★ ここに追加 ★★★
             "total_test_cases": result.overall_metrics.total_test_cases,
             "correct_predictions": result.overall_metrics.correct_predictions,
         }
