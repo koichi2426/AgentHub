@@ -33,6 +33,7 @@ interface TestRunMetricsDTO {
   accuracy: number;
   latency_ms: number;
   cost_estimate_mwh: number;
+  cost_estimate_mj: number; // ★ 追加：MJ換算の推論コスト
   total_test_cases: number;
   correct_predictions: number;
 }
@@ -50,7 +51,6 @@ export interface TestDeploymentInferenceRequest {
    * アップロードするテストデータファイル (.txt)。
    */
   testFile: File;
-  // deploymentId は URL パスパラメータとして送信するため、このリクエストデータ型には含めない
 }
 
 // ======================================
@@ -81,44 +81,39 @@ interface ApiError {
  */
 export async function testDeploymentInference(
   requestData: TestDeploymentInferenceRequest,
-  deploymentId: number, // ★ deploymentId に変更
+  deploymentId: number,
   token: string
 ): Promise<TestDeploymentInferenceResponse> {
-  // POST /v1/deployments/{deployment_id}/test エンドポイント
-  const url = `${API_URL}/v1/deployments/${deploymentId}/test`; // ★ URLを修正
+  const url = `${API_URL}/v1/deployments/${deploymentId}/test`;
 
-  // ファイル送信には FormData を使用
   const formData = new FormData();
-  
-  // バックエンドのUploadFile引数名 'test_file' に合わせて File オブジェクトを追加
-  // バックエンド: test_file: UploadFile = File(...)
-  formData.append('test_file', requestData.testFile, requestData.testFile.name); // ★ フィールド名を修正
+  formData.append("test_file", requestData.testFile, requestData.testFile.name);
 
   try {
     const response = await fetch(url, {
-      method: "POST", 
+      method: "POST",
       headers: {
-        // multipart/form-data を送信する場合、Content-Type ヘッダーは設定しない。
         "Authorization": `Bearer ${token}`,
       },
-      // リクエストボディに FormData オブジェクトを直接含める
       body: formData,
     });
 
     if (!response.ok) {
-      // エラーレスポンスをJSONとしてパース
       const errorData: ApiError = await response.json();
-      throw new Error(errorData.error || `HTTP error! status: ${response.status} ${response.statusText}`);
+      throw new Error(
+        errorData.error ||
+          `HTTP error! status: ${response.status} ${response.statusText}`
+      );
     }
-    
-    // 成功レスポンス (200 OK) をパース
-    return await response.json() as TestDeploymentInferenceResponse;
 
+    return (await response.json()) as TestDeploymentInferenceResponse;
   } catch (error) {
     console.error("Test Deployment Inference Fetch Error:", error);
     if (error instanceof Error) {
       throw error;
     }
-    throw new Error("An unknown error occurred while submitting the deployment test.");
+    throw new Error(
+      "An unknown error occurred while submitting the deployment test."
+    );
   }
 }

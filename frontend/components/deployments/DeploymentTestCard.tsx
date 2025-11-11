@@ -68,10 +68,12 @@ export default function DeploymentTestCard({
       ].join(",");
     });
 
+    // 👇 MJも含めたサマリーを追加
     const overallSummary = [
       ["Overall Accuracy:", overall_metrics.accuracy.toFixed(4)],
       ["Average Latency (ms):", overall_metrics.latency_ms.toFixed(3)],
       ["Average Cost (mWh):", overall_metrics.cost_estimate_mwh.toFixed(4)],
+      ["Average Cost (MJ):", overall_metrics.cost_estimate_mj.toFixed(6)], // ★追加
       ["Total Cases:", overall_metrics.total_test_cases],
       ["Correct Predictions:", overall_metrics.correct_predictions],
     ]
@@ -177,9 +179,7 @@ export default function DeploymentTestCard({
               </h4>
 
               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                <p className="font-medium text-muted-foreground">
-                  Total Cases:
-                </p>
+                <p className="font-medium text-muted-foreground">Total Cases:</p>
                 <p className="font-medium">{metrics.total_test_cases}</p>
 
                 <p className="font-medium text-muted-foreground">Correct:</p>
@@ -190,16 +190,16 @@ export default function DeploymentTestCard({
                   {(metrics.accuracy * 100).toFixed(2)}%
                 </p>
 
-                <p className="font-medium text-muted-foreground">
-                  Avg Latency:
-                </p>
-                <p className="font-medium">
-                  {metrics.latency_ms.toFixed(2)} ms
-                </p>
+                <p className="font-medium text-muted-foreground">Avg Latency:</p>
+                <p className="font-medium">{metrics.latency_ms.toFixed(2)} ms</p>
 
+                {/* --- ここを修正: MJも追加 --- */}
                 <p className="font-medium text-muted-foreground">Avg Cost:</p>
                 <p className="font-medium text-red-500">
                   {metrics.cost_estimate_mwh.toFixed(4)} mWh
+                  <span className="text-muted-foreground ml-2">
+                    ({metrics.cost_estimate_mj.toFixed(6)} MJ)
+                  </span>
                 </p>
               </div>
 

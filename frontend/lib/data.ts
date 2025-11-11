@@ -132,6 +132,7 @@ export type TestRunMetrics = {
   accuracy: number;
   latency_ms: number;
   cost_estimate_mwh: number;
+  cost_estimate_mj: number;
   total_test_cases: number;
   correct_predictions: number;
 };

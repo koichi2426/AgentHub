@@ -10,7 +10,7 @@ from usecase.test_deployment_inference import (
 )
 # ドメイン層の Value Objects をインポート
 from domain.value_objects.deployment_test_result import DeploymentTestResult
-from domain.value_objects.test_run_metrics import TestRunMetrics 
+from domain.value_objects.test_run_metrics import TestRunMetrics
 from domain.value_objects.inference_case_result import InferenceCaseResult
 
 
@@ -22,10 +22,12 @@ class TestDeploymentInferencePresenterImpl(TestDeploymentInferencePresenter):
         V.O.からデータを抽出し、ネストされた Dict 構造を作成する。
         """
 
+        # === 修正点: cost_estimate_mj を追加 ===
         overall_metrics_dict: Dict[str, Any] = {
             "accuracy": result.overall_metrics.accuracy,
             "latency_ms": result.overall_metrics.latency_ms,
             "cost_estimate_mwh": result.overall_metrics.cost_estimate_mwh,
+            "cost_estimate_mj": result.overall_metrics.cost_estimate_mj,  # ← 追加
             "total_test_cases": result.overall_metrics.total_test_cases,
             "correct_predictions": result.overall_metrics.correct_predictions,
         }
@@ -55,7 +57,5 @@ class TestDeploymentInferencePresenterImpl(TestDeploymentInferencePresenter):
 
 
 def new_test_deployment_inference_presenter() -> TestDeploymentInferencePresenter:
-    """
-    TestDeploymentInferencePresenterImpl のインスタンスを生成するファクトリ関数。
-    """
+    """TestDeploymentInferencePresenterImpl のインスタンスを生成するファクトリ関数。"""
     return TestDeploymentInferencePresenterImpl()
