@@ -68,13 +68,13 @@ export default function DeploymentTestCard({
       ].join(",");
     });
 
-    // mJ・gross_mjも含めたサマリー（安全にtoFixed）
+    // mJ・average_gross_mjも含めたサマリー（安全にtoFixed）
     const overallSummary = [
       ["Overall Accuracy:", (overall_metrics.accuracy ?? 0).toFixed(4)],
       ["Average Latency (ms):", (overall_metrics.latency_ms ?? 0).toFixed(3)],
       ["Average Cost (mWh):", (overall_metrics.cost_estimate_mwh ?? 0).toFixed(4)],
       ["Average Cost (mJ):", (overall_metrics.cost_estimate_mj ?? 0).toFixed(6)],
-      ["Gross Energy (mJ):", (overall_metrics.gross_mj ?? 0).toFixed(6)],
+      ["Average Gross Energy (mJ):", (overall_metrics.average_gross_mj ?? 0).toFixed(6)], // ★★★ 修正
       ["Total Cases:", overall_metrics.total_test_cases ?? 0],
       ["Correct Predictions:", overall_metrics.correct_predictions ?? 0],
     ]
@@ -197,9 +197,9 @@ export default function DeploymentTestCard({
                   </span>
                 </p>
 
-                <p className="font-medium text-muted-foreground">Gross Energy:</p>
+                <p className="font-medium text-muted-foreground">Average Gross Energy:</p>
                 <p className="font-medium text-blue-500">
-                  {(metrics.gross_mj ?? 0).toFixed(6)} mJ
+                  {(metrics.average_gross_mj ?? 0).toFixed(6)} mJ {/* ★★★ 修正 */}
                 </p>
               </div>
 

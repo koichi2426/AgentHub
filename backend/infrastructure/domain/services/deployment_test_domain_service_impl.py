@@ -77,7 +77,11 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 expected_output=expected_output.strip(),
                 predicted_output=predicted_output,
                 is_correct=is_correct,
-                raw_engine_response=engine_response,
+                raw_engine_response={
+                    **engine_response,
+                    "start_time_ns": engine_response.get("start_time_ns", 0),
+                    "end_time_ns": engine_response.get("end_time_ns", 0)
+                },
                 raw_power_response={
                     "base": power_base_response,
                     "active": power_active_response,
@@ -95,7 +99,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
             return await self._process_single_test_case(endpoint_url, input_text, expected_output)
 
     # ---------------------------
-    # 集計メトリクス計算 (Gross エネルギー)
+    # 集計メトリクス計算 (Average Gross Energy)
     # ---------------------------
     def _calculate_metrics(self, results: List[InferenceCaseResult]) -> TestRunMetrics:
         correct_predictions = sum(1 for r in results if r.is_correct)
@@ -104,7 +108,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
 
         total_latency_ns = 0
         total_net_power_watts = 0.0
-        gross_energy_j = 0.0  # 新規: Grossエネルギー積分用
+        total_gross_energy_j = 0.0  # 総Grossエネルギー
 
         for r in results:
             try:
@@ -117,10 +121,10 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 net_power_w    = max(0.0, power_active_w - power_base_w)
                 total_net_power_watts += net_power_w
 
-                # --- Grossエネルギー計算（台形法） ---
+                # Grossエネルギー計算（台形法）
                 dt_s = (end_ns - start_ns) / 1_000_000_000
                 avg_power_w = (power_active_w + power_base_w) / 2
-                gross_energy_j += avg_power_w * dt_s
+                total_gross_energy_j += avg_power_w * dt_s
             except Exception:
                 continue
 
@@ -130,7 +134,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 latency_ms=0.0,
                 cost_estimate_mwh=0.0,
                 cost_estimate_mj=0.0,
-                gross_mj=0.0,
+                average_gross_mj=0.0,
                 total_test_cases=0,
                 correct_predictions=0,
             )
@@ -142,19 +146,19 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         avg_net_power_w = total_net_power_watts / total_test_cases
         avg_latency_s = avg_latency_ms / 1000
 
-        # 既存コスト計算 (mWh, mJ) は変更なし
+        # 既存コスト計算 (mWh, mJ)
         cost_estimate_mwh = avg_net_power_w * (avg_latency_s / 3600) * 1000
         cost_estimate_mj  = avg_net_power_w * avg_latency_s * 1000
 
-        # Grossエネルギー (mJ)
-        gross_mj = gross_energy_j * 1000
+        # 平均Grossエネルギー (mJ) = 総Grossをケース数で割る
+        average_gross_mj = (total_gross_energy_j / total_test_cases) * 1000
 
         return TestRunMetrics(
             accuracy=accuracy,
             latency_ms=avg_latency_ms,
             cost_estimate_mwh=cost_estimate_mwh,
             cost_estimate_mj=cost_estimate_mj,
-            gross_mj=gross_mj,
+            average_gross_mj=average_gross_mj,
             total_test_cases=total_test_cases,
             correct_predictions=correct_predictions,
         )
