@@ -228,3 +228,6 @@ docker-compose down -v
 
 以上でセットアップ完了です。  
 これで AgentHub プロジェクトをローカル環境で実行できます。
+
+### アーキテクチャ
+<img width="16384" height="6873" alt="image" src="https://github.com/user-attachments/assets/03273332-8acd-4a0e-b3e1-1171ae7b1dd8" />
