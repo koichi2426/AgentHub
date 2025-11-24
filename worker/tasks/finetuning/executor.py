@@ -91,20 +91,42 @@ def execute_finetuning_pipeline(
         sftp_service.download_file(training_file_path_on_vps, local_training_file_path)
         print(f"INFO: Job {job_id}: Training file downloaded.")
 
-        # ★★★ 2.5. Extract Methods from Training File ★★★
-        print(f"INFO: Job {job_id}: Extracting methods...")
-        extract_methods_from_training_file(local_training_file_path, local_methods_file_path)
-        print(f"INFO: Job {job_id}: Method extraction complete.")
-        
-        # --- 3. Run Training Script ---
-        print(f"INFO: Job {job_id}: Starting training script...")
-        train_args = [
-            "--base_model_path", base_model_local_path,
-            "--training_file", local_training_file_path,
-            "--output_dir", temp_model_dir
-        ]
-        run_script(job_id, train_script_path, train_args, worker_base_dir)
-        print(f"INFO: Job {job_id}: Training script successful.")
+        # --- 2.5. Check if training data is empty ---
+        is_empty_training_data = False
+        try:
+            with open(local_training_file_path, 'r', encoding='utf-8') as f:
+                content = f.read().strip()
+                if not content or len(content) < 10:
+                    is_empty_training_data = True
+                    print(f"INFO: Job {job_id}: Training data is empty or too small. Skipping fine-tuning...")
+        except Exception as e:
+            print(f"WARN: Job {job_id}: Failed to check training data: {e}")
+
+        if is_empty_training_data:
+            # --- Copy base model without training ---
+            print(f"INFO: Job {job_id}: Copying base model without fine-tuning...")
+            shutil.copytree(base_model_local_path, temp_model_dir, dirs_exist_ok=True)
+            
+            # Create empty methods.txt
+            with open(local_methods_file_path, 'w', encoding='utf-8') as f:
+                f.write("")
+            print(f"INFO: Job {job_id}: Base model copied successfully (no training performed).")
+        else:
+            # --- Normal flow: Extract methods and run training ---
+            # ★★★ 2.6. Extract Methods from Training File ★★★
+            print(f"INFO: Job {job_id}: Extracting methods...")
+            extract_methods_from_training_file(local_training_file_path, local_methods_file_path)
+            print(f"INFO: Job {job_id}: Method extraction complete.")
+            
+            # --- 3. Run Training Script ---
+            print(f"INFO: Job {job_id}: Starting training script...")
+            train_args = [
+                "--base_model_path", base_model_local_path,
+                "--training_file", local_training_file_path,
+                "--output_dir", temp_model_dir
+            ]
+            run_script(job_id, train_script_path, train_args, worker_base_dir)
+            print(f"INFO: Job {job_id}: Training script successful.")
 
         # --- 4. Process Results ---
         print(f"INFO: Job {job_id}: Processing successful training results...")
