@@ -18,6 +18,7 @@ POWER_API_URL = os.environ.get("POWER_MONITOR_API_URL", "http://localhost:8080/p
 class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     """デプロイメントテスト実行の具体的な実装。"""
     MAX_CONCURRENCY = 1  # 並列実行数を制限
+    THRESHOLD = 0.6  # 類似度閾値
 
     def __init__(self, client: httpx.AsyncClient):
         self._client = client
@@ -25,11 +26,19 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     # ---------------------------
     # ヘルパー: 推論出力抽出
     # ---------------------------
-    def _extract_predicted_output(self, engine_response: Dict[str, Any]) -> str:
+    def _extract_predicted_output(self, engine_response: Dict[str, Any]) -> tuple[str, float]:
+        """推論結果からメソッド名と類似度を抽出する。
+        
+        Returns:
+            tuple[str, float]: (メソッド名, 類似度スコア)
+        """
         results = engine_response.get("results")
         if results and isinstance(results, list) and len(results) > 0:
-            return str(results[0].get("method", "")).strip()
-        return ""
+            top_result = results[0]
+            method = str(top_result.get("method", "")).strip()
+            similarity = float(top_result.get("similarity", 0.0))
+            return method, similarity
+        return "", 0.0
 
     # ---------------------------
     # 電力メトリクス取得
@@ -69,8 +78,16 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 inference_future, self._get_power_metrics()
             )
 
-            predicted_output = self._extract_predicted_output(engine_response)
-            is_correct = predicted_output.lower() == expected_output.lower()
+            predicted_output, similarity_score = self._extract_predicted_output(engine_response)
+            
+            # 正解判定ロジック
+            if expected_output.lower() == "none":
+                # 何もしないことが正解の場合: スコアが低ければ正解
+                is_correct = similarity_score < self.THRESHOLD
+            else:
+                # 特定のメソッドが正解の場合: 一致 & スコアが閾値以上
+                is_correct = (predicted_output.lower() == expected_output.lower() and 
+                             similarity_score >= self.THRESHOLD)
 
             return InferenceCaseResult(
                 input_data=input_line.strip(),
@@ -169,11 +186,17 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     async def run_batch_inference_test(self, test_file: UploadedFileStream, endpoint_url: str) -> DeploymentTestResult:
         file_bytes = await test_file.read()
         file_content = file_bytes.decode("utf-8").strip()
-        test_data_pairs = [
-            line.split("\t", 1)
-            for line in file_content.split("\n")
-            if line.strip() and len(line.split("\t", 1)) == 2
-        ]
+        
+        # 2カラム（context\tpositive）と3カラム（context\tpositive\tnegative）の両方に対応
+        test_data_pairs = []
+        for line in file_content.split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 2:  # 2カラム以上あればOK
+                input_text = parts[0]
+                expected_output = parts[1]  # 2カラム目（positive）のみ使用、3カラム目は無視
+                test_data_pairs.append((input_text, expected_output))
 
         semaphore = asyncio.Semaphore(self.MAX_CONCURRENCY)
         tasks = [
