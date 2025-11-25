@@ -25,11 +25,19 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     # ---------------------------
     # ヘルパー: 推論出力抽出
     # ---------------------------
-    def _extract_predicted_output(self, engine_response: Dict[str, Any]) -> str:
+    def _extract_predicted_output(self, engine_response: Dict[str, Any]) -> tuple[str, float]:
+        """推論結果からメソッド名と類似度を抽出する。
+        
+        Returns:
+            tuple[str, float]: (メソッド名, 類似度スコア)
+        """
         results = engine_response.get("results")
         if results and isinstance(results, list) and len(results) > 0:
-            return str(results[0].get("method", "")).strip()
-        return ""
+            top_result = results[0]
+            method = str(top_result.get("method", "")).strip()
+            similarity = float(top_result.get("similarity", 0.0))
+            return method, similarity
+        return "", 0.0
 
     # ---------------------------
     # 電力メトリクス取得
@@ -69,8 +77,9 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 inference_future, self._get_power_metrics()
             )
 
-            predicted_output = self._extract_predicted_output(engine_response)
-            is_correct = predicted_output.lower() == expected_output.lower()
+            predicted_output, similarity_score = self._extract_predicted_output(engine_response)
+            is_correct = (predicted_output.lower() == expected_output.lower() and 
+                         similarity_score >= 0.8)
 
             return InferenceCaseResult(
                 input_data=input_line.strip(),
