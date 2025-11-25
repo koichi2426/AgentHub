@@ -18,6 +18,7 @@ POWER_API_URL = os.environ.get("POWER_MONITOR_API_URL", "http://localhost:8080/p
 class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     """デプロイメントテスト実行の具体的な実装。"""
     MAX_CONCURRENCY = 1  # 並列実行数を制限
+    THRESHOLD = 0.8  # 類似度閾値
 
     def __init__(self, client: httpx.AsyncClient):
         self._client = client
@@ -78,8 +79,15 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
             )
 
             predicted_output, similarity_score = self._extract_predicted_output(engine_response)
-            is_correct = (predicted_output.lower() == expected_output.lower() and 
-                         similarity_score >= 0.8)
+            
+            # 正解判定ロジック
+            if expected_output.lower() == "none":
+                # 何もしないことが正解の場合: スコアが低ければ正解
+                is_correct = similarity_score < self.THRESHOLD
+            else:
+                # 特定のメソッドが正解の場合: 一致 & スコアが閾値以上
+                is_correct = (predicted_output.lower() == expected_output.lower() and 
+                             similarity_score >= self.THRESHOLD)
 
             return InferenceCaseResult(
                 input_data=input_line.strip(),
