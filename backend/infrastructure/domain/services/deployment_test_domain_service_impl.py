@@ -82,8 +82,10 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
             
             # 正解判定ロジック
             if expected_output.lower() == "none":
-                # 何もしないことが正解の場合: スコアが低ければ正解
-                is_correct = similarity_score < self.THRESHOLD
+                # 何もしないことが正解の場合:
+                # 1. スコアが低ければ正解
+                # 2. 予測メソッド自体が"none"なら正解
+                is_correct = (similarity_score < self.THRESHOLD) or (predicted_output.lower() == "none")
             else:
                 # 特定のメソッドが正解の場合: 一致 & スコアが閾値以上
                 is_correct = (predicted_output.lower() == expected_output.lower() and 
