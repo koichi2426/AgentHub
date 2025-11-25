@@ -178,11 +178,17 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     async def run_batch_inference_test(self, test_file: UploadedFileStream, endpoint_url: str) -> DeploymentTestResult:
         file_bytes = await test_file.read()
         file_content = file_bytes.decode("utf-8").strip()
-        test_data_pairs = [
-            line.split("\t", 1)
-            for line in file_content.split("\n")
-            if line.strip() and len(line.split("\t", 1)) == 2
-        ]
+        
+        # 2カラム（context\tpositive）と3カラム（context\tpositive\tnegative）の両方に対応
+        test_data_pairs = []
+        for line in file_content.split("\n"):
+            if not line.strip():
+                continue
+            parts = line.split("\t")
+            if len(parts) >= 2:  # 2カラム以上あればOK
+                input_text = parts[0]
+                expected_output = parts[1]  # 2カラム目（positive）のみ使用、3カラム目は無視
+                test_data_pairs.append((input_text, expected_output))
 
         semaphore = asyncio.Semaphore(self.MAX_CONCURRENCY)
         tasks = [
