@@ -48,54 +48,17 @@ export default function DeploymentTestCard({
 
   const handleDownloadReport = () => {
     if (!testResult) return;
-    const { overall_metrics, case_results } = testResult.test_result;
 
-    const headers = [
-      "ID",
-      "Input Data",
-      "Expected Output",
-      "Predicted Output",
-      "Is Correct",
-    ];
+    // APIレスポンスをそのままJSON形式でダウンロード
+    const jsonContent = JSON.stringify(testResult, null, 2);
 
-    const csvRows = case_results.map((caseResult) => {
-      return [
-        caseResult.id,
-        JSON.stringify(caseResult.input_data),
-        JSON.stringify(caseResult.expected_output),
-        JSON.stringify(caseResult.predicted_output),
-        caseResult.is_correct ? "TRUE" : "FALSE",
-      ].join(",");
-    });
-
-    // mJ・average_gross_mjも含めたサマリー（安全にtoFixed）
-    const overallSummary = [
-      ["Overall Accuracy:", (overall_metrics.accuracy ?? 0).toFixed(4)],
-      ["Average Latency (ms):", (overall_metrics.latency_ms ?? 0).toFixed(3)],
-      ["Average Cost (mWh):", (overall_metrics.cost_estimate_mwh ?? 0).toFixed(4)],
-      ["Average Cost (mJ):", (overall_metrics.cost_estimate_mj ?? 0).toFixed(6)],
-      ["Average Gross Energy (mJ):", (overall_metrics.average_gross_mj ?? 0).toFixed(6)], // ★★★ 修正
-      ["Total Cases:", overall_metrics.total_test_cases ?? 0],
-      ["Correct Predictions:", overall_metrics.correct_predictions ?? 0],
-    ]
-      .map((row) => row.join(","))
-      .join("\n");
-
-    const csvContent = [
-      `Deployment Test Report - Deployment ID: ${deploymentId}`,
-      overallSummary,
-      "\n--- Detailed Case Results ---",
-      headers.join(","),
-      ...csvRows,
-    ].join("\n");
-
-    const blob = new Blob([`\uFEFF${csvContent}`], {
-      type: "text/csv;charset=utf-8;",
+    const blob = new Blob([jsonContent], {
+      type: "application/json;charset=utf-8;",
     });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `deployment-report-${deploymentId}.csv`;
+    a.download = `deployment-report-${deploymentId}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -206,7 +169,7 @@ export default function DeploymentTestCard({
               <div className="mt-4 flex justify-end">
                 <Button variant="outline" onClick={handleDownloadReport}>
                   <Download className="mr-2 h-4 w-4" />
-                  Download Full Report (.csv)
+                  Download Full Report (.json)
                 </Button>
               </div>
             </div>

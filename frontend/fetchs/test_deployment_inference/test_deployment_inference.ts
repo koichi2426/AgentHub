@@ -10,11 +10,18 @@ interface EngineResponseRaw {
   end_time_ns: string;
 }
 
-interface PowerResponseRaw {
+// ★修正: 電力データの詳細構造を定義
+interface PowerMetricDTO {
   status: string;
   gpu_index: number;
   power_watts: string;
   timestamp_ns: string;
+}
+
+// ★修正: base と active のネスト構造に対応
+interface PowerResponseRaw {
+  base: PowerMetricDTO;
+  active: PowerMetricDTO;
 }
 
 interface InferenceCaseResultDTO {
@@ -32,7 +39,7 @@ interface TestRunMetricsDTO {
   latency_ms: number;
   cost_estimate_mwh: number;
   cost_estimate_mj: number;
-  average_gross_mj: number; // ★★★ 修正: gross_mj → average_gross_mj ★★★
+  average_gross_mj: number;
   total_test_cases: number;
   correct_predictions: number;
 }
