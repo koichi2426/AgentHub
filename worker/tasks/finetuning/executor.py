@@ -98,35 +98,34 @@ def execute_finetuning_pipeline(
                 content = f.read().strip()
                 if not content or len(content) < 10:
                     is_empty_training_data = True
-                    print(f"INFO: Job {job_id}: Training data is empty or too small. Skipping fine-tuning...")
+                    print(f"INFO: Job {job_id}: Training data is empty or too small. Will skip fine-tuning but proceed with export...")
         except Exception as e:
             print(f"WARN: Job {job_id}: Failed to check training data: {e}")
 
-        if is_empty_training_data:
-            # --- Copy base model without training ---
-            print(f"INFO: Job {job_id}: Copying base model without fine-tuning...")
-            shutil.copytree(base_model_local_path, temp_model_dir, dirs_exist_ok=True)
-            
-            # Create empty methods.txt
-            with open(local_methods_file_path, 'w', encoding='utf-8') as f:
-                f.write("")
-            print(f"INFO: Job {job_id}: Base model copied successfully (no training performed).")
-        else:
-            # --- Normal flow: Extract methods and run training ---
-            # ★★★ 2.6. Extract Methods from Training File ★★★
+        # --- 2.6. Extract Methods from Training File (通常データの場合のみ) ---
+        if not is_empty_training_data:
             print(f"INFO: Job {job_id}: Extracting methods...")
             extract_methods_from_training_file(local_training_file_path, local_methods_file_path)
             print(f"INFO: Job {job_id}: Method extraction complete.")
+        else:
+            # 空データの場合はプレースホルダー文字列を含むmethods.txtを作成
+            with open(local_methods_file_path, 'w', encoding='utf-8') as f:
+                f.write("# No specific methods found (Base Model usage)\n")
+            print(f"INFO: Job {job_id}: Created methods.txt with placeholder (no training performed)")
             
-            # --- 3. Run Training Script ---
-            print(f"INFO: Job {job_id}: Starting training script...")
-            train_args = [
-                "--base_model_path", base_model_local_path,
-                "--training_file", local_training_file_path,
-                "--output_dir", temp_model_dir
-            ]
-            run_script(job_id, train_script_path, train_args, worker_base_dir)
-            print(f"INFO: Job {job_id}: Training script successful.")
+        # --- 3. Run Training Script (空データの場合は --skip_training フラグ付き) ---
+        print(f"INFO: Job {job_id}: Starting training script...")
+        train_args = [
+            "--base_model_path", base_model_local_path,
+            "--training_file", local_training_file_path,
+            "--output_dir", temp_model_dir
+        ]
+        if is_empty_training_data:
+            train_args.append("--skip_training")
+            print(f"INFO: Job {job_id}: Running in export-only mode (no training)...")
+        
+        run_script(job_id, train_script_path, train_args, worker_base_dir)
+        print(f"INFO: Job {job_id}: Training script successful.")
 
         # --- 4. Process Results ---
         print(f"INFO: Job {job_id}: Processing successful training results...")

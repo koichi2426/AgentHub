@@ -330,26 +330,47 @@ def main():
     parser.add_argument("--lr", type=float, default=LR, help=f"Learning rate (default: {LR}).")
     # 追加: MAX_LENGTHも引数で受け取れるようにする
     parser.add_argument("--max_length", type=int, default=MAX_LENGTH, help=f"Maximum sequence length (default: {MAX_LENGTH}).")
+    # 追加: トレーニングをスキップするオプション
+    parser.add_argument("--skip_training", action="store_true", help="Skip training and only export the base model.")
 
     args = parser.parse_args()
 
     # --- 前処理 ---
-    if not os.path.exists(args.training_file):
+    if not args.skip_training and not os.path.exists(args.training_file):
         raise FileNotFoundError(f"Training file not found: {args.training_file}")
 
     # 出力ディレクトリの作成
     os.makedirs(args.output_dir, exist_ok=True)
 
-    # --- 訓練実行 ---
-    # 修正: max_lengthを渡し、calib_data_batchを受け取る
-    tokenizer, model, calib_data_batch = finetune_model(
-        model_name_or_path=args.base_model_path,
-        training_file=args.training_file,
-        output_dir=args.output_dir,
-        epochs=args.epochs,
-        lr=args.lr,
-        max_length=args.max_length
-    )
+    if args.skip_training:
+        # トレーニングなしでベースモデルをロードしてエクスポートのみ実行
+        print("\n[INFO] --skip_training enabled. Loading base model without training...")
+        tokenizer = AutoTokenizer.from_pretrained(args.base_model_path)
+        model = AutoModel.from_pretrained(args.base_model_path)
+        
+        # ベースモデルを出力ディレクトリに保存
+        model.save_pretrained(args.output_dir)
+        tokenizer.save_pretrained(args.output_dir)
+        print(f"✅ Base model saved to {args.output_dir}")
+        
+        # ダミーのキャリブレーションデータを作成
+        dummy_input_ids = torch.randint(0, tokenizer.vocab_size, (BATCH_SIZE, args.max_length), dtype=torch.long)
+        dummy_attention_mask = torch.ones((BATCH_SIZE, args.max_length), dtype=torch.long)
+        calib_data_batch = {
+            "input_ids": dummy_input_ids.unsqueeze(1).repeat(1, 3, 1),
+            "attention_mask": dummy_attention_mask.unsqueeze(1).repeat(1, 3, 1)
+        }
+    else:
+        # --- 訓練実行 ---
+        # 修正: max_lengthを渡し、calib_data_batchを受け取る
+        tokenizer, model, calib_data_batch = finetune_model(
+            model_name_or_path=args.base_model_path,
+            training_file=args.training_file,
+            output_dir=args.output_dir,
+            epochs=args.epochs,
+            lr=args.lr,
+            max_length=args.max_length
+        )
 
     # --- エクスポートと量子化 ---
     # 修正: max_lengthを渡す
