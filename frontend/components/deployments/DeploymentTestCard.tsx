@@ -38,6 +38,23 @@ export default function DeploymentTestCard({
 }: DeploymentTestCardProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
+  // RFC 4180 準拠のCSVフィールドエスケープ
+  const toCsvField = (value: unknown): string => {
+    let s: string;
+    if (value === null || value === undefined) {
+      s = "";
+    } else if (typeof value === "object") {
+      try {
+        s = JSON.stringify(value);
+      } catch {
+        s = String(value);
+      }
+    } else {
+      s = String(value);
+    }
+    return `"${s.replace(/"/g, '""')}"`;
+  };
+
   const handleTest = () => {
     if (!selectedFile) {
       alert("TXTファイルを選択してください。");
@@ -61,9 +78,9 @@ export default function DeploymentTestCard({
     const csvRows = case_results.map((caseResult) => {
       return [
         caseResult.id,
-        JSON.stringify(caseResult.input_data),
-        JSON.stringify(caseResult.expected_output),
-        JSON.stringify(caseResult.predicted_output),
+        toCsvField(caseResult.input_data),
+        toCsvField(caseResult.expected_output),
+        toCsvField(caseResult.predicted_output),
         caseResult.is_correct ? "TRUE" : "FALSE",
       ].join(",");
     });
