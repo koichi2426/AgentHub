@@ -11,7 +11,8 @@ import {
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Rocket } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Rocket, Info } from "lucide-react";
 import { createFinetuningJob } from "@/fetchs/create_finetuning_job/create_finetuning_job";
 import Cookies from "js-cookie";
 
@@ -77,12 +78,27 @@ export default function FineTuningUploader({
       <CardHeader>
         <CardTitle>Submit New Fine-tuning Job</CardTitle>
         <CardDescription>
-          Upload a Text file containing training data for fine-tuning.
+          Upload a training file or method definitions to update your agent.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertDescription className="text-sm">
+            <strong>Two modes supported:</strong>
+            <ul className="mt-2 space-y-1 list-disc list-inside">
+              <li>
+                <strong>Fine-tuning Mode:</strong> Upload tab-separated triplet data (Anchor, Positive, Negative) to train the model. Requires 10+ valid lines.
+              </li>
+              <li>
+                <strong>Method Definition Mode:</strong> Upload a list of method names (one per line, no tabs) to update available methods without training.
+              </li>
+            </ul>
+          </AlertDescription>
+        </Alert>
+
         <div className="grid w-full gap-2">
-          <Label htmlFor="training-data-file">Training Data File (.txt)</Label>
+          <Label htmlFor="training-data-file">Training Data or Methods File (.txt)</Label>
           <Input
             id="training-data-file"
             type="file"
