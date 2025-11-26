@@ -130,7 +130,7 @@ VPS_KEY_HOST_PATH=/Users/あなたのユーザー名/.ssh/id_rsa
 以下のコマンドでコンテナをビルド・起動します。
 
 ```bash
-docker-compose up --build -d
+docker compose up --build -d
 ```
 
 オプションの意味：
