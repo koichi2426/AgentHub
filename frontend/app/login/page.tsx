@@ -40,8 +40,9 @@ export default function LoginPage() {
       
       // 取得したトークンをクッキーに保存
       Cookies.set(AUTH_TOKEN_COOKIE_NAME, response.token, {
-        expires: 7, // トークンの有効期限 (7日間)
-        secure: process.env.NODE_ENV === "production", // 本番環境ではHTTPSのみ
+        expires: 7,
+        secure: false, // ← 修正: 開発環境でも動作するようにfalseに変更
+        sameSite: "Lax", // ← 追加: CSRF対策としてLaxを設定
       });
 
       // ログイン成功後、ホームページにリダイレクト
