@@ -149,13 +149,13 @@ docker compose up --build -d
 #### 1. マイグレーションスクリプトの自動生成
 
 ```bash
-docker-compose exec backend alembic revision --autogenerate -m "Initial migration"
+docker compose exec backend alembic revision --autogenerate -m "Initial migration"
 ```
 
 #### 2. マイグレーションの適用（テーブル作成）
 
 ```bash
-docker-compose exec backend alembic upgrade head
+docker compose exec backend alembic upgrade head
 ```
 
 ---
