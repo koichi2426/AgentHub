@@ -91,36 +91,74 @@ def execute_finetuning_pipeline(
         sftp_service.download_file(training_file_path_on_vps, local_training_file_path)
         print(f"INFO: Job {job_id}: Training file downloaded.")
 
-        # --- 2.5. Check if training data is empty ---
-        is_empty_training_data = False
+        # --- 2.5. Auto-detect Mode: Empty / Method Definition / Training ---
+        is_skip_training = False
+        file_mode = None  # 'empty', 'method_definition', 'training'
+        
         try:
             with open(local_training_file_path, 'r', encoding='utf-8') as f:
                 content = f.read().strip()
-                if not content or len(content) < 10:
-                    is_empty_training_data = True
-                    print(f"INFO: Job {job_id}: Training data is empty or too small. Will skip fine-tuning but proceed with export...")
+                
+                # Case 1: Empty file
+                if not content:
+                    file_mode = 'empty'
+                    is_skip_training = True
+                    print(f"INFO: Job {job_id}: File is empty. Skipping training and using base model.")
+                
+                # Case 2: Method Definition Mode (no tabs)
+                elif '\t' not in content:
+                    file_mode = 'method_definition'
+                    is_skip_training = True
+                    print(f"INFO: Job {job_id}: Method Definition Mode detected (no tabs). Skipping training.")
+                
+                # Case 3: Training Mode (contains tabs)
+                else:
+                    file_mode = 'training'
+                    # Count valid training lines
+                    lines = [line.strip() for line in content.split('\n') if line.strip()]
+                    valid_lines = [line for line in lines if line.count('\t') >= 2]
+                    
+                    if len(valid_lines) < 10:
+                        is_skip_training = True
+                        print(f"INFO: Job {job_id}: Training Mode detected but only {len(valid_lines)} valid lines (< 10). Skipping training.")
+                    else:
+                        is_skip_training = False
+                        print(f"INFO: Job {job_id}: Training Mode detected with {len(valid_lines)} valid lines. Proceeding with training.")
+                        
         except Exception as e:
-            print(f"WARN: Job {job_id}: Failed to check training data: {e}")
+            print(f"WARN: Job {job_id}: Failed to analyze training file: {e}")
+            file_mode = 'empty'
+            is_skip_training = True
 
-        # --- 2.6. Extract Methods from Training File (通常データの場合のみ) ---
-        if not is_empty_training_data:
-            print(f"INFO: Job {job_id}: Extracting methods...")
+        # --- 2.6. Generate methods.txt based on detected mode ---
+        if file_mode == 'empty':
+            # Empty file: Write placeholder
+            with open(local_methods_file_path, 'w', encoding='utf-8') as f:
+                f.write("# No methods defined (Empty input)\n")
+            print(f"INFO: Job {job_id}: Created methods.txt with empty placeholder.")
+            
+        elif file_mode == 'method_definition':
+            # Method Definition Mode: Copy file content as-is
+            with open(local_training_file_path, 'r', encoding='utf-8') as src:
+                methods_content = src.read().strip()
+            with open(local_methods_file_path, 'w', encoding='utf-8') as dst:
+                dst.write(methods_content)
+            print(f"INFO: Job {job_id}: Copied method definitions to methods.txt.")
+            
+        elif file_mode == 'training':
+            # Training Mode: Extract methods from training data
+            print(f"INFO: Job {job_id}: Extracting methods from training data...")
             extract_methods_from_training_file(local_training_file_path, local_methods_file_path)
             print(f"INFO: Job {job_id}: Method extraction complete.")
-        else:
-            # 空データの場合はプレースホルダー文字列を含むmethods.txtを作成
-            with open(local_methods_file_path, 'w', encoding='utf-8') as f:
-                f.write("# No specific methods found (Base Model usage)\n")
-            print(f"INFO: Job {job_id}: Created methods.txt with placeholder (no training performed)")
             
-        # --- 3. Run Training Script (空データの場合は --skip_training フラグ付き) ---
+        # --- 3. Run Training Script (with --skip_training flag if needed) ---
         print(f"INFO: Job {job_id}: Starting training script...")
         train_args = [
             "--base_model_path", base_model_local_path,
             "--training_file", local_training_file_path,
             "--output_dir", temp_model_dir
         ]
-        if is_empty_training_data:
+        if is_skip_training:
             train_args.append("--skip_training")
             print(f"INFO: Job {job_id}: Running in export-only mode (no training)...")
         
