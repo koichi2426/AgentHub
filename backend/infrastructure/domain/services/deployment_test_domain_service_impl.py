@@ -17,8 +17,8 @@ POWER_API_URL = os.environ.get("POWER_MONITOR_API_URL", "http://localhost:8080/p
 
 class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     """デプロイメントテスト実行の具体的な実装。"""
-    MAX_CONCURRENCY = 2  # 並列実行数を制限
-    REQUEST_DELAY = 1.0  # リクエスト間の待機時間（秒）
+    MAX_CONCURRENCY = 1  # 並列実行数を制限
+    REQUEST_DELAY = 0.7  # リクエスト間の待機時間（秒）
     THRESHOLD = 0.6  # 類似度閾値
 
     def __init__(self, client: httpx.AsyncClient):
