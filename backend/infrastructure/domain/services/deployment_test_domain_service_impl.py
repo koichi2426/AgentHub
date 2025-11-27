@@ -18,7 +18,7 @@ POWER_API_URL = os.environ.get("POWER_MONITOR_API_URL", "http://localhost:8080/p
 class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     """デプロイメントテスト実行の具体的な実装。"""
     MAX_CONCURRENCY = 1  # 並列実行数を制限
-    REQUEST_DELAY = 0.7  # リクエスト間の待機時間（秒）
+    REQUEST_DELAY = 0.2  # リクエスト間の待機時間（秒）
     THRESHOLD = 0.6  # 類似度閾値
 
     def __init__(self, client: httpx.AsyncClient):
@@ -70,7 +70,7 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
     # ---------------------------
     # 単一テストケース処理
     # ---------------------------
-    async def _process_single_test_case(self, endpoint_url: str, input_line: str, expected_output: str) -> Optional[InferenceCaseResult]:
+    async def _process_single_test_case(self, endpoint_url: str, input_line: str, expected_output: str) -> InferenceCaseResult:
         try:
             power_base_response = await self._get_power_metrics()
             inference_future = self._run_single_inference(endpoint_url, input_line)
@@ -107,13 +107,21 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                     "active": power_active_response,
                 },
             )
-        except Exception:
-            return None
+        except Exception as e:
+            # エラー発生時もNoneではなく、エラー情報を入れたResultを返す（不正解扱い）
+            return InferenceCaseResult(
+                input_data=input_line.strip(),
+                expected_output=expected_output.strip(),
+                predicted_output="ERROR",
+                is_correct=False,
+                raw_engine_response={"error": str(e), "status": "error"},
+                raw_power_response={},
+            )
 
     # ---------------------------
     # 並列制御ヘルパー
     # ---------------------------
-    async def _execute_with_concurrency_limit(self, semaphore: asyncio.Semaphore, endpoint_url: str, input_text: str, expected_output: str) -> Optional[InferenceCaseResult]:
+    async def _execute_with_concurrency_limit(self, semaphore: asyncio.Semaphore, endpoint_url: str, input_text: str, expected_output: str) -> InferenceCaseResult:
         async with semaphore:
             # エンジンの負荷を軽減するため、各リクエスト前に待機
             await asyncio.sleep(self.REQUEST_DELAY)
@@ -208,12 +216,13 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
             for input_text, expected_output in test_data_pairs
         ]
 
-        case_results: List[Optional[InferenceCaseResult]] = await asyncio.gather(*tasks)
-        valid_case_results = [r for r in case_results if r is not None]
-
-        overall_metrics = self._calculate_metrics(valid_case_results)
+        # 全てのケースの結果を取得（Noneは返ってこない）
+        case_results: List[InferenceCaseResult] = await asyncio.gather(*tasks)
+        
+        # そのまま全件を集計に回す
+        overall_metrics = self._calculate_metrics(case_results)
 
         return DeploymentTestResult(
             overall_metrics=overall_metrics,
-            case_results=valid_case_results,
+            case_results=case_results,
         )
