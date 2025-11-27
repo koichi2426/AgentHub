@@ -78,6 +78,10 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
             engine_response, power_active_response = await asyncio.gather(
                 inference_future, self._get_power_metrics()
             )
+            
+            # エンジンからの明示的なエラーチェック
+            if engine_response.get("status") == "error":
+                 raise Exception(f"Engine Error: {engine_response.get('error_detail')}")
 
             predicted_output, similarity_score = self._extract_predicted_output(engine_response)
             
@@ -138,22 +142,45 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
         total_latency_ns = 0
         total_net_power_watts = 0.0
         total_gross_energy_j = 0.0  # 総Grossエネルギー
+        
+        valid_latency_count = 0     # 正常にレイテンシが取れた件数
+        valid_power_count = 0       # 正常に電力が取れた件数
 
         for r in results:
             try:
+                # エラーケースなどで時刻情報がない場合はスキップ
+                if "start_time_ns" not in r.raw_engine_response or "end_time_ns" not in r.raw_engine_response:
+                    continue
+
                 start_ns = int(r.raw_engine_response.get("start_time_ns", 0))
                 end_ns = int(r.raw_engine_response.get("end_time_ns", 0))
-                total_latency_ns += (end_ns - start_ns)
+                
+                if end_ns > start_ns:
+                    latency = end_ns - start_ns
+                    total_latency_ns += latency
+                    valid_latency_count += 1
 
-                power_active_w = float(r.raw_power_response["active"].get("power_watts", "0.0"))
-                power_base_w   = float(r.raw_power_response["base"].get("power_watts", "0.0"))
-                net_power_w    = max(0.0, power_active_w - power_base_w)
-                total_net_power_watts += net_power_w
+                    # --- 電力計算 (statusチェックを追加) ---
+                    base_data = r.raw_power_response.get("base", {})
+                    active_data = r.raw_power_response.get("active", {})
 
-                # Grossエネルギー計算（台形法）
-                dt_s = (end_ns - start_ns) / 1_000_000_000
-                avg_power_w = (power_active_w + power_base_w) / 2
-                total_gross_energy_j += avg_power_w * dt_s
+                    # 両方のステータスが "ok" の場合のみ計算に含める
+                    if base_data.get("status") == "ok" and active_data.get("status") == "ok":
+                        power_active_w = float(active_data.get("power_watts", "0.0"))
+                        power_base_w   = float(base_data.get("power_watts", "0.0"))
+                        
+                        # 明らかな異常値(0.0W)も弾く
+                        if power_active_w > 0 and power_base_w > 0:
+                            net_power_w = max(0.0, power_active_w - power_base_w)
+                            total_net_power_watts += net_power_w
+
+                            # Grossエネルギー計算（台形法）
+                            dt_s = latency / 1_000_000_000
+                            avg_power_w = (power_active_w + power_base_w) / 2
+                            total_gross_energy_j += avg_power_w * dt_s
+                            
+                            valid_power_count += 1 # 有効データ数カウント
+
             except Exception:
                 continue
 
@@ -168,19 +195,21 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
                 correct_predictions=0,
             )
 
-        # 平均レイテンシ (ミリ秒)
-        avg_latency_ms = (total_latency_ns / total_test_cases) / 1_000_000
+        # 平均レイテンシ (ミリ秒) - 成功したケースのみで平均を取る
+        avg_latency_ms = (total_latency_ns / valid_latency_count) / 1_000_000 if valid_latency_count > 0 else 0.0
 
-        # 平均電力 (W) = Netベース
-        avg_net_power_w = total_net_power_watts / total_test_cases
+        # 電力計算の分母は「有効な電力データ数」にする
+        power_divisor = valid_power_count if valid_power_count > 0 else 1
+        
+        avg_net_power_w = total_net_power_watts / power_divisor
         avg_latency_s = avg_latency_ms / 1000
 
         # 既存コスト計算 (mWh, mJ)
         cost_estimate_mwh = avg_net_power_w * (avg_latency_s / 3600) * 1000
         cost_estimate_mj  = avg_net_power_w * avg_latency_s * 1000
 
-        # 平均Grossエネルギー (mJ) = 総Grossをケース数で割る
-        average_gross_mj = (total_gross_energy_j / total_test_cases) * 1000
+        # 平均Grossエネルギー (mJ)
+        average_gross_mj = (total_gross_energy_j / power_divisor) * 1000
 
         return TestRunMetrics(
             accuracy=accuracy,
@@ -216,10 +245,10 @@ class DeploymentTestDomainServiceImpl(DeploymentTestDomainService):
             for input_text, expected_output in test_data_pairs
         ]
 
-        # 全てのケースの結果を取得（Noneは返ってこない）
+        # 全ての結果を取得（Noneは返ってこない）
         case_results: List[InferenceCaseResult] = await asyncio.gather(*tasks)
         
-        # そのまま全件を集計に回す
+        # 集計（エラーも含む全件、ただし電力計算からは除外）
         overall_metrics = self._calculate_metrics(case_results)
 
         return DeploymentTestResult(
